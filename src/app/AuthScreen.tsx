@@ -19,7 +19,10 @@ function message(code: string) {
   if (/popup-blocked/.test(code)) return "Your browser blocked the Google window. Allow pop-ups for this site and try again."
   if (/network/.test(code)) return "The tracker can’t be reached right now. Check your connection and try again."
   if (/operation-not-allowed/.test(code)) return "This way of logging in isn’t switched on for the site yet."
-  return "Something went wrong. Try again."
+  if (/configuration-not-found/.test(code)) return "Logins aren’t switched on for this site yet. The site owner needs to enable Authentication in Firebase."
+  if (/unauthorized-domain/.test(code)) return "This web address isn’t allowed to log in yet. The site owner needs to add it to Firebase’s authorised domains."
+  if (/api-key|requests-from-referer/.test(code)) return "The site’s Firebase key was refused. The site owner needs to check its settings."
+  return `Something went wrong (${code || "unknown error"}). Try again.`
 }
 
 type Mode = "in" | "up" | "forgot"
