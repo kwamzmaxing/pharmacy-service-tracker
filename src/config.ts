@@ -4,12 +4,12 @@
 // Access is controlled by the security rules in firestore.rules.
 
 export const firebaseConfig = {
-  apiKey: "",
-  authDomain: "",
-  projectId: "",
-  storageBucket: "",
-  messagingSenderId: "",
-  appId: "",
+  apiKey: "AIzaSyB_QYvUECZZ39uk6jp3VyaB0BZBQmgK7tA",
+  authDomain: "service-tracker-invoice.firebaseapp.com",
+  projectId: "service-tracker-invoice",
+  storageBucket: "service-tracker-invoice.firebasestorage.app",
+  messagingSenderId: "1006803367671",
+  appId: "1:1006803367671:web:9427b1642630a1b08045f2",
 }
 
 /** OAuth client ID used to connect each person's Gmail and Google Calendar. */
