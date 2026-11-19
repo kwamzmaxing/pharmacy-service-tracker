@@ -13,7 +13,7 @@ export const firebaseConfig = {
 }
 
 /** OAuth client ID used to connect each person's Gmail and Google Calendar. */
-export const googleClientId = ""
+export const googleClientId = "326233687170-uj2ft0s4egpj1lol7mjmdb8as1fa5mfo.apps.googleusercontent.com"
 
 /** Where the site is published; used in emails. */
 export const siteUrl = "https://kwamzmaxing.github.io/pharmacy-service-tracker/"
