@@ -25,7 +25,7 @@ const connLabel = (s: ConnStatus) => ({ ready: "Connected", not_connected: "Not 
 const connTone = (s: ConnStatus) => (s === "ready" ? "done" : s === "unavailable" ? "pending" : "overdue") as "done" | "pending" | "overdue"
 
 export function AccountTab() {
-  const { data, commit, me, ask, replaceAll, logOut, accountDeleted, google, connect, disconnectGoogle, settings, isAdmin, openFeedback } = useApp()
+  const { data, commit, me, ask, replaceAll, logOut, accountDeleted, google, connect, disconnectGoogle, settings, isAdmin, openFeedback, go } = useApp()
   const p = data.profile
   const restoreRef = useRef<HTMLInputElement>(null)
   const combineRef = useRef<HTMLInputElement>(null)
@@ -264,12 +264,9 @@ export function AccountTab() {
             {text("gphc", "GPhC registration no. (optional)")}
             {area("address", "Address")}
           </fieldset>
-          <fieldset className="grid gap-3 sm:grid-cols-2">
-            <legend className="mb-2 text-[11px] font-bold uppercase tracking-[0.08em] text-muted-foreground">Bill to (pharmacy)</legend>
-            {text("billToName", "Pharmacy / company name", { placeholder: "e.g. High St Pharmacy" })}
-            {text("billToEmail", "Accounts email (invoices go here)", { type: "email", placeholder: "accounts@pharmacy.co.uk" })}
-            {area("billToAddress", "Pharmacy address")}
-          </fieldset>
+          <p className="rounded-lg bg-secondary px-3.5 py-3 text-[13px] text-muted-foreground">
+            The pharmacies you invoice are saved on the <button type="button" className="font-semibold text-brand-ink hover:underline" onClick={() => go("clients")}>Pharmacies</button> tab, each with its own details.
+          </p>
           <fieldset className="grid gap-3 sm:grid-cols-2">
             <legend className="mb-2 text-[11px] font-bold uppercase tracking-[0.08em] text-muted-foreground">Getting paid</legend>
             {text("accountName", "Account name")}

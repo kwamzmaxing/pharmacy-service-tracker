@@ -180,7 +180,7 @@ export function EmailDialog({ req, onClose, onBack }: { req: { id: string; kind:
   useEffect(() => {
     if (!inv) return
     const t = kind === "invoice" ? invoiceEmailText(inv, data.profile) : reminderText(inv, data.profile)
-    setTo(inv.to.email || data.profile.billToEmail || "")
+    setTo(inv.to.email || data.clients.find((c) => c.id === inv.clientId)?.email || data.profile.billToEmail || "")
     setSubject(t.subject)
     setBody(t.body)
     setAttach(kind === "invoice")
@@ -197,7 +197,9 @@ export function EmailDialog({ req, onClose, onBack }: { req: { id: string; kind:
         i.sentVia = via
       } else i.reminders.push(new Date().toISOString())
       if (to && !i.to.email) i.to.email = to
-      if (to && !d.profile.billToEmail) d.profile.billToEmail = to
+      const cl = i.clientId ? d.clients.find((c) => c.id === i.clientId) : undefined
+      if (to && cl && !cl.email) cl.email = to
+      else if (to && !cl && !d.profile.billToEmail) d.profile.billToEmail = to
     }, msg)
   }
   async function sendNow() {

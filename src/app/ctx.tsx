@@ -3,7 +3,7 @@ import type { Data } from "@/lib/model"
 import type { OutboxItem, PublicSettings } from "@/lib/cloud"
 import type { ConnStatus, GoogleArea } from "@/lib/google"
 
-export type Tab = "log" | "summary" | "invoices" | "services" | "account" | "admin"
+export type Tab = "log" | "summary" | "invoices" | "clients" | "services" | "account" | "admin"
 export type EmailKind = "invoice" | "followup"
 export type Me = { uid: string; email: string; name: string; emailVerified: boolean; viaGoogle: boolean }
 
@@ -25,6 +25,10 @@ export type AppApi = {
   ask: (o: AskOptions) => Promise<boolean>
   go: (t: Tab) => void
   viewInvoice: (id: string, justCreated?: boolean) => void
+  /** Open a pharmacy's profile on the Pharmacies tab. */
+  openClient: (id: string) => void
+  /** The pharmacy whose profile is open, if any. */
+  clientView: string | null
   email: (id: string, kind: EmailKind) => void
   showFollowUps: () => void
   openFeedback: () => void

@@ -19,9 +19,10 @@ import { SummaryTab } from "@/app/SummaryTab"
 import { InvoicesTab } from "@/app/InvoicesTab"
 import { ServicesTab } from "@/app/ServicesTab"
 import { AccountTab } from "@/app/AccountTab"
+import { ClientsTab } from "@/app/ClientsTab"
 import { AdminTab, processOutbox } from "@/app/AdminTab"
 
-const BASE_TABS: [Tab, string][] = [["log", "Log"], ["summary", "Summary"], ["invoices", "Invoices"], ["services", "Services"], ["account", "Account"]]
+const BASE_TABS: [Tab, string][] = [["log", "Log"], ["summary", "Summary"], ["invoices", "Invoices"], ["clients", "Pharmacies"], ["services", "Services"], ["account", "Account"]]
 const PROBLEM_TEXT: Record<SaveProblem, string> = {
   offline: "You’re offline. Changes are kept on this device and saved when you reconnect.",
   full: "Storage is full. Delete some old invoices or entries.",
@@ -61,6 +62,7 @@ export default function App() {
   const [emailReq, setEmailReq] = useState<{ id: string; kind: EmailKind; fromFollowUps: boolean } | null>(null)
   const [followOpen, setFollowOpen] = useState(false)
   const [feedbackOpen, setFeedbackOpen] = useState(false)
+  const [clientView, setClientView] = useState<string | null>(null)
   const [google, setGoogle] = useState<Record<GoogleArea, ConnStatus>>({ gmail: googleStatus("gmail"), calendar: googleStatus("calendar"), sheets: googleStatus("sheets") })
   const [admin, setAdmin] = useState(false)
   const [settings, setSettings] = useState<PublicSettings | null>(null)
@@ -100,8 +102,9 @@ export default function App() {
     if (!d) {
       d = newData(m.name)
       d.profile.email = m.email
-      await vault.save(d)
     }
+    // Saves a new tracker, and keeps any one-off upgrades from loading (only changed parts are written)
+    await vault.save(d)
     dataRef.current = d
     setData(d)
     setMe(m)
@@ -176,7 +179,7 @@ export default function App() {
     vaultRef.current.save(d)
     if (message) toast(message)
   }, [])
-  const go = useCallback((t: Tab) => { setTab(t); window.scrollTo({ top: 0 }) }, [])
+  const go = useCallback((t: Tab) => { setTab(t); setClientView(null); window.scrollTo({ top: 0 }) }, [])
   const leave = useCallback(async (notice: string) => {
     setInvoiceView(null); setEmailReq(null); setFollowOpen(false); setFeedbackOpen(false); setOutbox([])
     disconnect()
@@ -203,13 +206,15 @@ export default function App() {
       data, me, commit, replaceAll, ask, go, google, connect, isAdmin: admin, settings, setSettings, outbox, refreshOutbox,
       disconnectGoogle: () => { disconnect(); refreshGoogle(); toast("Google disconnected on this device") },
       viewInvoice: (id, justCreated = false) => setInvoiceView({ id, justCreated }),
+      openClient: (id) => { setClientView(id); setTab("clients"); window.scrollTo({ top: 0 }) },
+      clientView,
       email: (id, kind) => { setInvoiceView(null); setEmailReq({ id, kind, fromFollowUps: false }) },
       showFollowUps: () => setFollowOpen(true),
       openFeedback: () => setFeedbackOpen(true),
       logOut: () => leave("You’ve logged out."),
       accountDeleted: () => leave("Your account was deleted."),
     }
-  }, [data, me, commit, replaceAll, ask, go, google, connect, admin, settings, outbox, refreshOutbox, leave])
+  }, [data, me, commit, replaceAll, ask, go, google, connect, admin, settings, outbox, refreshOutbox, leave, clientView])
 
   const confirm = <ConfirmDialog req={askReq} onDone={(ok) => { askResolve.current?.(ok); askResolve.current = null; setAskReq(null) }} />
   const toaster = <Toaster position="bottom-center" toastOptions={{ style: { fontFamily: "Figtree, system-ui, sans-serif" } }} />
@@ -228,19 +233,17 @@ export default function App() {
   return (
     <AppCtx.Provider value={api}>
       <div className="min-h-screen pb-12">
-        <header className="sticky top-[env(safe-area-inset-top,0px)] z-40 bg-header pb-3.5 pt-4 shadow-[0_1px_0_rgba(0,0,0,.06)]">
+        <header className="sticky top-[env(safe-area-inset-top,0px)] z-40 border-b bg-card/95 backdrop-blur supports-[backdrop-filter]:bg-card/85">
           <div className="wrap">
-            <div className="flex items-center justify-between gap-3">
-              <div className="flex min-w-0 items-center gap-3">
-                <div className="flex size-10 flex-none items-center justify-center rounded-[11px] border border-white/20 bg-white/10 font-display text-[23px] font-bold text-header-fg">℞</div>
-                <div className="min-w-0">
-                  <h1 className="font-display text-[19px] font-bold leading-tight tracking-[-0.01em] text-white">Service Tracker</h1>
-                  <p className="truncate text-[12.5px] font-medium text-header-muted">Logged in as {name}</p>
-                </div>
+            <div className="flex items-center justify-between gap-3 pb-2 pt-3.5">
+              <div className="flex min-w-0 items-center gap-2.5">
+                <div className="flex size-8 flex-none items-center justify-center rounded-md bg-primary font-display text-[19px] font-bold text-primary-foreground" aria-hidden>℞</div>
+                <h1 className="font-display text-[17px] font-bold tracking-[-0.015em]">Service Tracker</h1>
               </div>
               <DropdownMenu>
-                <DropdownMenuTrigger aria-label="Account menu" className="flex size-[38px] flex-none items-center justify-center rounded-full bg-white text-[13.5px] font-bold text-[hsl(var(--header))] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70">
-                  {initials(name)}
+                <DropdownMenuTrigger aria-label="Account menu" className="flex min-w-0 items-center gap-2 rounded-full py-1 pl-3 pr-1 text-[13px] text-muted-foreground hover:bg-secondary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                  <span className="hidden max-w-[180px] truncate sm:inline">{name}</span>
+                  <span className="flex size-8 flex-none items-center justify-center rounded-full bg-accent text-[12.5px] font-bold text-accent-foreground">{initials(name)}</span>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-60">
                   <DropdownMenuLabel className="font-normal">
@@ -254,16 +257,17 @@ export default function App() {
                 </DropdownMenuContent>
               </DropdownMenu>
             </div>
-            <nav className="-mx-1 mt-3.5 flex gap-1 overflow-x-auto px-1 [scrollbar-width:none]" aria-label="Sections">
+            <nav className="-mx-2 flex overflow-x-auto px-2 [scrollbar-width:none]" aria-label="Sections">
               {TABS.map(([k, l]) => (
                 <button key={k} type="button" aria-current={tab === k ? "page" : undefined} onClick={() => go(k)}
                   className={cn(
-                    "flex flex-[1_0_auto] items-center justify-center gap-1.5 rounded-[9px] px-3 py-2 text-[13.5px] font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70",
-                    tab === k ? "bg-white text-[hsl(var(--header))]" : "bg-white/10 text-header-muted hover:bg-white/20",
+                    "relative flex flex-none items-center gap-1.5 whitespace-nowrap px-3 pb-2.5 pt-1.5 text-[14px] font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring",
+                    "after:absolute after:inset-x-3 after:bottom-0 after:h-[2px] after:rounded-full",
+                    tab === k ? "text-foreground after:bg-primary" : "text-muted-foreground hover:text-foreground after:bg-transparent",
                   )}>
                   {l}
                   {k === "invoices" && due > 0 && (
-                    <span className="inline-flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-[#E5534B] px-1.5 text-[11px] font-bold text-white" aria-label={`${due} follow-ups due`}>{due}</span>
+                    <span className="inline-flex h-[17px] min-w-[17px] items-center justify-center rounded-full bg-destructive px-1 text-[10.5px] font-bold text-destructive-foreground" aria-label={`${due} follow-ups due`}>{due}</span>
                   )}
                 </button>
               ))}
@@ -271,11 +275,12 @@ export default function App() {
           </div>
         </header>
 
-        <main className="wrap pt-4">
+        <main className="wrap pt-5">
           {tab === "log" && <LogTab />}
           {tab === "summary" && <SummaryTab />}
           {tab === "invoices" && <InvoicesTab />}
           {tab === "services" && <ServicesTab />}
+          {tab === "clients" && <ClientsTab />}
           {tab === "account" && <AccountTab />}
           {tab === "admin" && admin && <AdminTab />}
         </main>

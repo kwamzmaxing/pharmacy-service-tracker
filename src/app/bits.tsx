@@ -8,10 +8,10 @@ import { Textarea } from "@/components/ui/textarea"
 
 export function Panel({ title, aside, children, className }: { title?: ReactNode; aside?: ReactNode; children: ReactNode; className?: string }) {
   return (
-    <section className={cn("min-w-0 rounded-[14px] border bg-card p-[18px] text-card-foreground", className)}>
+    <section className={cn("min-w-0 rounded-[10px] border bg-card p-5 text-card-foreground", className)}>
       {(title || aside) && (
-        <div className="mb-3.5 flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
-          {title && <h2 className="font-display text-[15.5px] font-bold tracking-[-0.01em]">{title}</h2>}
+        <div className="mb-4 flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
+          {title && <h2 className="font-display text-[16px] font-bold tracking-[-0.015em]">{title}</h2>}
           {aside && <span className="text-xs font-medium text-muted-foreground">{aside}</span>}
         </div>
       )}
@@ -110,6 +110,21 @@ export function Callout({ tone = "warn", children }: { tone?: "warn" | "danger";
   return (
     <div className={cn("flex flex-wrap items-center justify-between gap-3 rounded-[9px] px-3.5 py-3 text-[13px]", tone === "danger" ? "bg-danger-tint text-danger-ink" : "bg-warn-tint text-warn")}>
       {children}
+    </div>
+  )
+}
+
+/** A row of headline figures in one ruled strip (not a set of floating cards). */
+export function Ledger({ cells }: { cells: { label: string; value: string; sub?: string; alert?: boolean }[] }) {
+  return (
+    <div className="grid grid-cols-2 overflow-hidden rounded-[10px] border bg-card sm:grid-cols-4">
+      {cells.map((c, i) => (
+        <div key={c.label} className={cn("min-w-0 px-4 py-3.5", i % 2 === 1 && "border-l", i >= 2 && "border-t sm:border-t-0", i === 2 && "sm:border-l", c.alert && "bg-danger-tint")}>
+          <div className="truncate text-[12px] font-medium text-muted-foreground">{c.label}</div>
+          <div className={cn("num mt-1 truncate font-display text-[clamp(18px,4.8vw,23px)] font-bold tracking-[-0.02em]", c.alert && "text-danger-ink")}>{c.value}</div>
+          {c.sub && <div className="mt-0.5 truncate text-[11.5px] text-muted-foreground">{c.sub}</div>}
+        </div>
+      ))}
     </div>
   )
 }

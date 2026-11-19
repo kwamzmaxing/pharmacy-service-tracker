@@ -1,6 +1,18 @@
 // Data model and pure helpers for the service tracker.
 
-export type Service = { id: string; name: string; fee: number }
+export type Unit = "each" | "mile" | "hour"
+export type Service = { id: string; name: string; fee: number; unit?: Unit }
+/** A pharmacy (or other employer) you invoice. Saved once, reused on every invoice. */
+export type Client = {
+  id: string
+  name: string
+  contact: string
+  email: string
+  phone: string
+  address: string
+  notes: string
+  created: string
+}
 export type Entry = {
   id: string
   serviceId: string
@@ -11,6 +23,8 @@ export type Entry = {
   invoiced: boolean
   invoiceId?: string
   hours?: boolean
+  /** Which pharmacy this work was for. */
+  clientId?: string
 }
 export type Terms = "14th" | "0" | "7" | "14" | "30"
 export type Profile = {
@@ -39,7 +53,7 @@ export type Profile = {
   /** How invoice and follow-up emails go out by default. */
   sendVia: "mine" | "admin"
 }
-export type InvoiceLine = { name: string; fee: number; qty: number; amt: number }
+export type InvoiceLine = { name: string; fee: number; qty: number; amt: number; unit?: Unit }
 export type Invoice = {
   id: string
   number: string
@@ -52,6 +66,7 @@ export type Invoice = {
   pay: { accountName: string; bankName: string; sortCode: string; accountNumber: string }
   lines: InvoiceLine[]
   total: number
+  clientId?: string
   entryIds: string[]
   status: "paid" | "unpaid"
   paidDate: string | null
@@ -65,6 +80,7 @@ export type Invoice = {
 }
 export type Data = {
   services: Service[]
+  clients: Client[]
   entries: Entry[]
   invoices: Invoice[]
   profile: Profile
@@ -116,8 +132,20 @@ export const STD_SERVICES = (): Service[] => [
   { id: uid(), name: "Travel Vaccine", fee: 5 },
   { id: uid(), name: "Anti-Malaria Sale", fee: 5 },
   { id: uid(), name: "Private Weight Loss Clinic", fee: 10 },
-  { id: uid(), name: "Hours Worked (£25/hr)", fee: 25 },
+  { id: uid(), name: "Hours Worked (£25/hr)", fee: 25, unit: "hour" },
+  { id: uid(), name: "Mileage", fee: 0.5, unit: "mile" },
 ]
+export const UNITS: [Unit, string, string][] = [["each", "each", "Quantity"], ["mile", "per mile", "Miles"], ["hour", "per hour", "Hours"]]
+export const unitOf = (s?: Pick<Service, "unit" | "name">): Unit => s?.unit || (s && /hour/i.test(s.name) ? "hour" : s && /mile/i.test(s.name) ? "mile" : "each")
+/** "12.5 miles", "7.5 hours", "3" */
+export function qtyText(qty: number, unit?: Unit) {
+  const n = Number(qty) || 0
+  const v = Number.isInteger(n) ? String(n) : n.toFixed(2).replace(/0$/, "")
+  if (unit === "mile") return `${v} ${n === 1 ? "mile" : "miles"}`
+  if (unit === "hour") return `${v} ${n === 1 ? "hour" : "hours"}`
+  return v
+}
+export const feeText = (fee: number, unit?: Unit) => money(fee) + (unit === "mile" ? "/mile" : unit === "hour" ? "/hr" : "")
 export const defaultProfile = (): Profile => ({
   fullName: "", tradingName: "", gphc: "", phone: "", email: "", address: "",
   billToName: "", billToEmail: "", billToAddress: "",
@@ -129,7 +157,7 @@ export function newData(name = ""): Data {
   const profile = defaultProfile()
   profile.fullName = name
   profile.accountName = name
-  return { services: STD_SERVICES(), entries: [], invoices: [], profile, meta: { ratesV: "d1" } }
+  return { services: STD_SERVICES(), clients: [], entries: [], invoices: [], profile, meta: { ratesV: "d1", mileage: 1, clients: 1 } }
 }
 /** Fill in anything missing, so old back-ups and older saved data still load. */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -143,8 +171,30 @@ export function normalize(raw: any): Data {
     ...i, reminders: i.reminders || [], to: i.to || { name: "", address: "", email: "" },
     from: i.from || ({} as Invoice["from"]), pay: i.pay || ({} as Invoice["pay"]), lines: i.lines || [],
   }))
+  const services: Service[] = Array.isArray(d.services) ? d.services : STD_SERVICES()
+  // Mileage became a standard service: add it once to older trackers
+  if (!meta.mileage) {
+    if (!services.some((s) => /mile/i.test(s.name))) services.push({ id: uid(), name: "Mileage", fee: 0.5, unit: "mile" })
+    meta.mileage = 1
+  }
+  const clients: Client[] = Array.isArray(d.clients) ? d.clients : []
+  // Pharmacy profiles replaced the single "Bill to" block: turn it into the first saved pharmacy
+  if (!meta.clients) {
+    if (!clients.length && profile.billToName) {
+      clients.push({ id: uid(), name: profile.billToName, contact: "", email: profile.billToEmail, phone: "", address: profile.billToAddress, notes: "", created: new Date().toISOString() })
+    }
+    // Earlier invoices: link them to a saved pharmacy with the same name, saving any that aren't there yet
+    for (const i of invoices) {
+      if (i.clientId || !i.to?.name) continue
+      let c = clients.find((x) => x.name.trim().toLowerCase() === i.to.name.trim().toLowerCase())
+      if (!c) clients.push((c = { id: uid(), name: i.to.name, contact: "", email: i.to.email || "", phone: "", address: i.to.address || "", notes: "", created: i.created || new Date().toISOString() }))
+      i.clientId = c.id
+    }
+    meta.clients = 1
+  }
   return {
-    services: Array.isArray(d.services) ? d.services : STD_SERVICES(),
+    services,
+    clients,
     entries: Array.isArray(d.entries) ? d.entries : [],
     invoices,
     profile,
@@ -228,7 +278,7 @@ export function invoiceEmailText(inv: Invoice, p: Profile) {
     "",
     `Please find below invoice ${inv.number} for services in ${inv.period}.`,
     "",
-    ...inv.lines.map((l) => `• ${l.name}: ${l.qty} × ${money(l.fee)} = ${money(l.amt)}`),
+    ...inv.lines.map((l) => `• ${l.name}: ${qtyText(l.qty, l.unit)} × ${feeText(l.fee, l.unit)} = ${money(l.amt)}`),
     "",
     `Total due: ${money(inv.total)}`,
     `Invoice date: ${fmtDate(inv.issued)}`,
@@ -251,17 +301,22 @@ export function invoiceEmailText(inv: Invoice, p: Profile) {
 
 export const nextNumber = (p: Profile) => `${(p.prefix || "INV").trim()}-${String(p.nextNo || 1).padStart(4, "0")}`
 
+/** Entries ready to invoice for a pharmacy: in range, not invoiced, logged for it (or for no pharmacy). */
+export const pendingFor = (d: Data, r: Range, clientId?: string) =>
+  d.entries.filter((e) => inRange(r, e.date) && !e.invoiced && (!clientId || !e.clientId || e.clientId === clientId))
+
 /** Build an invoice from the entries in range that aren't on an invoice yet. */
-export function draftInvoice(d: Data, r: Range, fallbackName: string) {
-  const pend = d.entries.filter((e) => inRange(r, e.date) && !e.invoiced)
+export function draftInvoice(d: Data, r: Range, fallbackName: string, clientId?: string) {
+  const pend = pendingFor(d, r, clientId)
   if (!pend.length) return null
   const svc = (id: string) => d.services.find((s) => s.id === id)
   const groups: Record<string, InvoiceLine> = {}
   for (const e of pend) {
-    const name = svc(e.serviceId)?.name ?? "—"
+    const s = svc(e.serviceId)
+    const name = s?.name ?? "—"
     const fee = Number(e.fee) || 0
     const k = name + "|" + fee
-    groups[k] ??= { name, fee, qty: 0, amt: 0 }
+    groups[k] ??= { name, fee, qty: 0, amt: 0, unit: unitOf(s) }
     groups[k].qty += Number(e.qty) || 0
     groups[k].amt += entryAmt(e)
   }
@@ -270,13 +325,15 @@ export function draftInvoice(d: Data, r: Range, fallbackName: string) {
   const dates = pend.map((e) => e.date).sort()
   const first = dates[0], last = dates[dates.length - 1]
   const p = d.profile
+  const client = clientId ? d.clients.find((c) => c.id === clientId) : undefined
   const issued = today()
   const period =
     r.mode === "month" || r.mode === "last" ? rangeLabel(r) : first === last ? fmtDate(first) : `${fmtDate(first)} – ${fmtDate(last)}`
   const inv: Invoice = {
     id: uid(), number: nextNumber(p), issued, due: dueDate(issued, p.terms), terms: p.terms, period,
     from: { name: p.fullName || fallbackName, trading: p.tradingName, address: p.address, phone: p.phone, email: p.email, gphc: p.gphc },
-    to: { name: p.billToName, address: p.billToAddress, email: p.billToEmail },
+    to: client ? { name: client.name, address: client.address, email: client.email } : { name: p.billToName, address: p.billToAddress, email: p.billToEmail },
+    clientId: client?.id,
     pay: { accountName: p.accountName, bankName: p.bankName, sortCode: p.sortCode, accountNumber: p.accountNumber },
     lines, total, entryIds: pend.map((e) => e.id),
     status: "unpaid", paidDate: null, reminders: [], created: new Date().toISOString(),
@@ -312,7 +369,7 @@ export function reminderText(inv: Invoice, p: Profile) {
 // Saved as small documents: core settings, one per month of entries, one per invoice.
 export type DocMap = Record<string, Record<string, unknown>>
 export function buildDocs(d: Data): DocMap {
-  const docs: DocMap = { core: { services: d.services, profile: d.profile, meta: d.meta, v: 2 } }
+  const docs: DocMap = { core: { services: d.services, clients: d.clients, profile: d.profile, meta: d.meta, v: 2 } }
   for (const e of d.entries) {
     const k = "m-" + (/^\d{4}-\d{2}/.test(e.date || "") ? e.date.slice(0, 7) : "other")
     ;((docs[k] ??= { entries: [] }).entries as Entry[]).push(e)
@@ -323,10 +380,97 @@ export function buildDocs(d: Data): DocMap {
 export function assembleDocs(docs: DocMap): Data | null {
   const core = docs.core
   if (!core) return null
-  const d = { services: core.services, profile: core.profile, meta: core.meta || {}, entries: [] as Entry[], invoices: [] as Invoice[] }
+  const d = { services: core.services, clients: core.clients, profile: core.profile, meta: core.meta || {}, entries: [] as Entry[], invoices: [] as Invoice[] }
   for (const k of Object.keys(docs).sort()) {
     if (k.startsWith("m-")) d.entries.push(...((docs[k].entries as Entry[]) || []))
     else if (k.startsWith("inv-") && docs[k].invoice) d.invoices.push(docs[k].invoice as Invoice)
   }
   return normalize(d)
+}
+
+/* ---------- figures for the invoices page ---------- */
+const ymOf = (iso: string) => iso.slice(0, 7)
+const sum = (xs: number[]) => xs.reduce((a, b) => a + b, 0)
+/** The UK tax year (6 April – 5 April) containing a date. */
+export function taxYear(onDate = today()) {
+  const y = Number(onDate.slice(0, 4))
+  const start = onDate >= `${y}-04-06` ? y : y - 1
+  return { from: `${start}-04-06`, to: `${start + 1}-04-05`, label: `${start}/${String(start + 1).slice(2)}` }
+}
+export const daysToPay = (i: Invoice) => (i.status === "paid" && i.paidDate ? Math.max(0, daysBetween(i.issued, i.paidDate)) : null)
+const avg = (xs: number[]) => (xs.length ? Math.round(sum(xs) / xs.length) : null)
+
+export type MonthPoint = { ym: string; label: string; logged: number; paid: number }
+/** The last `n` months: what was logged (earned) and what was paid. */
+export function monthly(d: Data, n = 6): MonthPoint[] {
+  const now = new Date()
+  const out: MonthPoint[] = []
+  for (let k = n - 1; k >= 0; k--) {
+    const m = new Date(now.getFullYear(), now.getMonth() - k, 1)
+    const ym = `${m.getFullYear()}-${String(m.getMonth() + 1).padStart(2, "0")}`
+    out.push({
+      ym,
+      label: m.toLocaleDateString("en-GB", { month: "short" }),
+      logged: sum(d.entries.filter((e) => ymOf(e.date) === ym).map(entryAmt)),
+      paid: sum(d.invoices.filter((i) => i.status === "paid" && i.paidDate && ymOf(i.paidDate) === ym).map((i) => i.total)),
+    })
+  }
+  return out
+}
+
+export type ClientStats = { billed: number; paid: number; owed: number; overdue: number; invoices: number; avgDays: number | null; lastInvoice: string | null; oldestDue: string | null }
+export function clientStats(d: Data, clientId: string): ClientStats {
+  const invs = d.invoices.filter((i) => i.clientId === clientId)
+  const open = invs.filter((i) => i.status !== "paid")
+  return {
+    billed: sum(invs.map((i) => i.total)),
+    paid: sum(invs.filter((i) => i.status === "paid").map((i) => i.total)),
+    owed: sum(open.map((i) => i.total)),
+    overdue: sum(open.filter((i) => invStatus(i) === "overdue").map((i) => i.total)),
+    invoices: invs.length,
+    avgDays: avg(invs.map(daysToPay).filter((x): x is number => x !== null)),
+    lastInvoice: invs.map((i) => i.issued).sort().pop() ?? null,
+    oldestDue: open.map((i) => i.due).sort()[0] ?? null,
+  }
+}
+
+export type Insight = { tone: "good" | "warn" | "danger" | "info"; text: string; action?: "summary" | "followups" | "clients" }
+/** Plain-English observations, most useful first. */
+export function insights(d: Data): Insight[] {
+  const out: Insight[] = []
+  const t = today()
+  const months = monthly(d, 2)
+  const [prev, cur] = months
+  const overdue = d.invoices.filter((i) => invStatus(i) === "overdue")
+  if (overdue.length) {
+    const oldest = Math.max(...overdue.map((i) => daysBetween(i.due, t)))
+    out.push({ tone: "danger", text: `${plural(overdue.length, "invoice")} overdue (${money(sum(overdue.map((i) => i.total)))}), the oldest by ${plural(oldest, "day")}.`, action: "followups" })
+  }
+  const uninvoiced = sum(d.entries.filter((e) => !e.invoiced && e.date < `${cur.ym}-01`).map(entryAmt))
+  if (uninvoiced > 0) out.push({ tone: "warn", text: `${money(uninvoiced)} of work from earlier months hasn’t been invoiced yet.`, action: "summary" })
+  if (cur.logged > 0 && prev.logged > 0) {
+    const pct = Math.round(((cur.logged - prev.logged) / prev.logged) * 100)
+    const dayOfMonth = Number(t.slice(8, 10))
+    if (pct >= 0) out.push({ tone: "good", text: `You’ve logged ${money(cur.logged)} so far this month, ${pct}% more than all of last month.` })
+    else if (dayOfMonth >= 25) out.push({ tone: "info", text: `${money(cur.logged)} logged this month, ${Math.abs(pct)}% less than last month.` })
+    else out.push({ tone: "info", text: `${money(cur.logged)} logged so far this month (last month: ${money(prev.logged)}).` })
+  }
+  const payers = d.clients
+    .map((c) => ({ c, s: clientStats(d, c.id), n: d.invoices.filter((i) => i.clientId === c.id && daysToPay(i) !== null).length }))
+    .filter((x) => x.s.avgDays !== null && x.n >= 2)
+    .sort((a, b) => (b.s.avgDays ?? 0) - (a.s.avgDays ?? 0))
+  if (payers.length >= 2) out.push({ tone: "info", text: `${payers[0].c.name} is your slowest payer, at ${payers[0].s.avgDays} days on average; ${payers[payers.length - 1].c.name} pays fastest (${payers[payers.length - 1].s.avgDays} days).`, action: "clients" })
+  else if (payers.length === 1) out.push({ tone: "info", text: `${payers[0].c.name} pays in ${payers[0].s.avgDays} days on average.`, action: "clients" })
+  const ty = taxYear(t)
+  const mileSvc = new Set(d.services.filter((s) => unitOf(s) === "mile").map((s) => s.id))
+  const miles = d.entries.filter((e) => mileSvc.has(e.serviceId) && e.date >= ty.from && e.date <= ty.to)
+  if (miles.length) out.push({ tone: "info", text: `${qtyText(sum(miles.map((e) => Number(e.qty) || 0)), "mile")} claimed in the ${ty.label} tax year (${money(sum(miles.map(entryAmt)))}).` })
+  const bySvc: Record<string, number> = {}
+  for (const e of d.entries.filter((e) => ymOf(e.date) === cur.ym)) bySvc[e.serviceId] = (bySvc[e.serviceId] || 0) + entryAmt(e)
+  const top = Object.entries(bySvc).sort((a, b) => b[1] - a[1])[0]
+  if (top && cur.logged > 0) {
+    const s = d.services.find((x) => x.id === top[0])
+    if (s) out.push({ tone: "info", text: `${s.name} is your biggest earner this month: ${money(top[1])}, ${Math.round((top[1] / cur.logged) * 100)}% of the total.` })
+  }
+  return out.slice(0, 5)
 }

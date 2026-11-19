@@ -2,9 +2,10 @@ import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { cn } from "@/lib/utils"
-import { daysBetween, fmtDate, followUpsDue, invStatus, isoOf, money, monthLabel, nextFollowUp, plural, today, type Invoice, type Profile, type Status } from "@/lib/model"
+import { daysBetween, daysToPay, fmtDate, followUpsDue, insights, invStatus, isoOf, money, monthLabel, monthly, nextFollowUp, plural, taxYear, today, type Invoice, type Profile, type Status } from "@/lib/model"
+import { MonthlyBars } from "./charts"
 import { useApp } from "./ctx"
-import { Callout, Chips, Empty, Panel, Pill } from "./bits"
+import { Callout, Chips, Empty, Ledger, Panel, Pill } from "./bits"
 import { markPaid } from "./dialogs"
 
 type Filter = "all" | "unpaid" | "overdue" | "paid"
@@ -12,7 +13,7 @@ type Sort = "issued-desc" | "issued-asc" | "due"
 const LABEL: Record<Status, string> = { paid: "Paid", unpaid: "Unpaid", overdue: "Overdue" }
 
 export function InvoicesTab() {
-  const { data, commit, ask, go, viewInvoice, email, showFollowUps } = useApp()
+  const { data, commit, ask, go, viewInvoice, email, showFollowUps, openClient } = useApp()
   const [filter, setFilter] = useState<Filter>("all")
   const [sort, setSort] = useState<Sort>("issued-desc")
 
@@ -21,6 +22,23 @@ export function InvoicesTab() {
   const sum = (xs: { i: Invoice }[]) => xs.reduce((a, x) => a + (Number(x.i.total) || 0), 0)
   const out = pick((x) => x.s !== "paid"), od = pick((x) => x.s === "overdue"), paid = pick((x) => x.s === "paid")
   const due = followUpsDue(data)
+  const ty = taxYear()
+  const paidThisYear = sum(paid.filter((x) => x.i.paidDate && x.i.paidDate >= ty.from && x.i.paidDate <= ty.to))
+  const paidDays = data.invoices.map(daysToPay).filter((x): x is number => x !== null)
+  const avgDays = paidDays.length ? Math.round(paidDays.reduce((a, b) => a + b, 0) / paidDays.length) : null
+  const notes = insights(data)
+  const series = monthly(data, 6)
+  const owedMap: Record<string, { key: string; clientId?: string; name: string; amount: number; overdue: number; count: number; oldest: string }> = {}
+  for (const { i, s } of out) {
+    const key = i.clientId || "name:" + (i.to.name || "—")
+    const c = i.clientId ? data.clients.find((x) => x.id === i.clientId) : undefined
+    const o = (owedMap[key] ??= { key, clientId: c?.id, name: c?.name || i.to.name || "No pharmacy", amount: 0, overdue: 0, count: 0, oldest: i.due })
+    o.amount += i.total
+    o.count++
+    if (s === "overdue") o.overdue += i.total
+    if (i.due < o.oldest) o.oldest = i.due
+  }
+  const owedBy = Object.values(owedMap).sort((a, b) => b.amount - a.amount)
 
   const rows = all
     .filter((x) => filter === "all" || (filter === "unpaid" ? x.s !== "paid" : x.s === filter))
@@ -47,6 +65,15 @@ export function InvoicesTab() {
 
   return (
     <div className="grid gap-4">
+      <Ledger
+        cells={[
+          { label: "Owed to you", value: money(sum(out)), sub: out.length ? plural(out.length, "unpaid invoice") : "Nothing outstanding" },
+          { label: "Overdue", value: money(sum(od)), sub: od.length ? plural(od.length, "invoice") : "None", alert: od.length > 0 },
+          { label: `Paid in ${ty.label} tax year`, value: money(paidThisYear), sub: "6 April to 5 April" },
+          { label: "Average time to pay", value: avgDays === null ? "—" : plural(avgDays, "day"), sub: avgDays === null ? "Shows once invoices are paid" : "From invoice to payment" },
+        ]}
+      />
+
       {due.length > 0 && (
         <Callout tone="danger">
           <span><b>{due.length === 1 ? "1 follow-up due" : `${due.length} follow-ups due`}</b> · {money(due.reduce((a, i) => a + i.total, 0))} unpaid past its follow-up date</span>
@@ -54,27 +81,61 @@ export function InvoicesTab() {
         </Callout>
       )}
 
-      <div className="grid grid-cols-3 gap-2.5">
-        <Stat label="Outstanding" value={money(sum(out))} sub={plural(out.length, "invoice")} />
-        <Stat label="Overdue" value={money(sum(od))} sub={plural(od.length, "invoice")} alert={od.length > 0} />
-        <Stat label="Paid" value={money(sum(paid))} sub={plural(paid.length, "invoice")} />
-      </div>
+      {notes.length > 0 && (
+        <Panel title="What stands out">
+          <ul className="grid gap-2.5">
+            {notes.map((n, k) => (
+              <li key={k} className="flex items-start gap-3 text-[13.5px] leading-snug">
+                <span className={cn("mt-[6px] size-2 flex-none rounded-full", n.tone === "danger" ? "bg-destructive" : n.tone === "warn" ? "bg-warn" : n.tone === "good" ? "bg-[var(--series-paid)]" : "bg-muted-foreground/50")} aria-hidden />
+                <span className="min-w-0 flex-1">
+                  {n.text}{" "}
+                  {n.action && (
+                    <button type="button" className="whitespace-nowrap font-semibold text-brand-ink hover:underline"
+                      onClick={() => (n.action === "followups" ? showFollowUps() : go(n.action === "summary" ? "summary" : "clients"))}>
+                      {n.action === "followups" ? "Follow up" : n.action === "summary" ? "Create invoice" : "See pharmacies"} →
+                    </button>
+                  )}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </Panel>
+      )}
 
-      <Panel>
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <Chips<Filter> label="Show" value={filter} onChange={setFilter} options={[["all", "All"], ["unpaid", "Unpaid"], ["overdue", "Overdue"], ["paid", "Paid"]]} />
-          <Select value={sort} onValueChange={(v) => setSort(v as Sort)}>
-            <SelectTrigger aria-label="Sort invoices" className="h-9 w-auto gap-2 bg-field text-[13px] shadow-none"><SelectValue /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="issued-desc">Newest first</SelectItem>
-              <SelectItem value="issued-asc">Oldest first</SelectItem>
-              <SelectItem value="due">By due date</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
+      <Panel title="Last six months">
+        <MonthlyBars points={series} />
       </Panel>
 
-      <Panel>
+      {owedBy.length > 0 && (
+        <Panel title="Owed to you, by pharmacy">
+          <ul className="divide-y">
+            {owedBy.map((o) => (
+              <li key={o.key}>
+                <button type="button" disabled={!o.clientId} onClick={() => o.clientId && openClient(o.clientId)}
+                  className="flex w-full items-center gap-3 py-2.5 text-left enabled:hover:bg-secondary/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-[14px] font-semibold">{o.name}</span>
+                    <span className="text-[12.5px] text-muted-foreground">{plural(o.count, "invoice")} · oldest due {fmtDate(o.oldest)}{o.overdue > 0 && <> · <span className="font-semibold text-danger-ink">{money(o.overdue)} overdue</span></>}</span>
+                  </span>
+                  <span className="num text-[14.5px] font-bold">{money(o.amount)}</span>
+                </button>
+              </li>
+            ))}
+          </ul>
+        </Panel>
+      )}
+
+      <Panel title="All invoices" aside={
+        <Select value={sort} onValueChange={(v) => setSort(v as Sort)}>
+          <SelectTrigger aria-label="Sort invoices" className="h-8 w-auto gap-2 bg-field text-[13px] shadow-none"><SelectValue /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="issued-desc">Newest first</SelectItem>
+            <SelectItem value="issued-asc">Oldest first</SelectItem>
+            <SelectItem value="due">By due date</SelectItem>
+          </SelectContent>
+        </Select>
+      }>
+        {data.invoices.length > 0 && <div className="mb-3"><Chips<Filter> label="Show" value={filter} onChange={setFilter} options={[["all", "All"], ["unpaid", "Unpaid"], ["overdue", "Overdue"], ["paid", "Paid"]]} /></div>}
         {!data.invoices.length ? (
           <Empty title="No invoices yet">
             Create one from the Summary tab and it’ll be saved here.
@@ -97,16 +158,6 @@ export function InvoicesTab() {
           </div>
         )}
       </Panel>
-    </div>
-  )
-}
-
-function Stat({ label, value, sub, alert }: { label: string; value: string; sub: string; alert?: boolean }) {
-  return (
-    <div className={cn("min-w-0 rounded-[14px] border bg-card px-3.5 py-3", alert && "border-destructive/40 bg-danger-tint")}>
-      <div className="text-[11.5px] font-semibold text-muted-foreground">{label}</div>
-      <div className={cn("num mt-0.5 truncate font-display text-[clamp(15px,4.4vw,21px)] font-bold tracking-[-0.01em]", alert && "text-danger-ink")}>{value}</div>
-      <div className="text-[11.5px] text-muted-foreground">{sub}</div>
     </div>
   )
 }

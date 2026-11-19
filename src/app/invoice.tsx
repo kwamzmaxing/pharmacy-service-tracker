@@ -1,5 +1,5 @@
 import { renderToStaticMarkup } from "react-dom/server"
-import { fmtDate, invStatus, money, termsText, type Invoice } from "@/lib/model"
+import { feeText, fmtDate, invStatus, money, qtyText, termsText, type Invoice } from "@/lib/model"
 
 const Lines = ({ text }: { text: string }) => (
   <>
@@ -49,14 +49,14 @@ export function InvoiceDoc({ inv }: { inv: Invoice }) {
       <div className="overflow-x-auto">
         <table>
           <thead>
-            <tr><th>Service</th><th className="r">Qty</th><th className="r">Fee</th><th className="r">Amount</th></tr>
+            <tr><th>Service</th><th className="r">Qty</th><th className="r">Rate</th><th className="r">Amount</th></tr>
           </thead>
           <tbody>
             {inv.lines.map((l, i) => (
               <tr key={i}>
                 <td>{l.name}</td>
-                <td className="r num">{l.qty}</td>
-                <td className="r num">{money(l.fee)}</td>
+                <td className="r num">{qtyText(l.qty, l.unit)}</td>
+                <td className="r num">{feeText(l.fee, l.unit)}</td>
                 <td className="r num">{money(l.amt)}</td>
               </tr>
             ))}
