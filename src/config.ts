@@ -1,0 +1,23 @@
+// Fill these in from your Firebase project (Project settings → Your apps → Web app)
+// and Google Cloud (APIs & Services → Credentials → OAuth client ID, type "Web application").
+// These values are public by design: they identify the project, they are not secrets.
+// Access is controlled by the security rules in firestore.rules.
+
+export const firebaseConfig = {
+  apiKey: "",
+  authDomain: "",
+  projectId: "",
+  storageBucket: "",
+  messagingSenderId: "",
+  appId: "",
+}
+
+/** OAuth client ID used to connect each person's Gmail and Google Calendar. */
+export const googleClientId = ""
+
+/** Where the site is published; used in emails. */
+export const siteUrl = "https://kwamzmaxing.github.io/pharmacy-service-tracker/"
+
+const useEmulator = import.meta.env.VITE_USE_EMULATOR === "1"
+export const isConfigured = useEmulator || !!(firebaseConfig.apiKey && firebaseConfig.projectId)
+export const emulator = useEmulator

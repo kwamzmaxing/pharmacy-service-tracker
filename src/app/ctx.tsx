@@ -1,12 +1,11 @@
 import { createContext, useContext } from "react"
 import type { Data } from "@/lib/model"
-import type { Connection } from "@/lib/store"
-import type { Session } from "@/lib/accounts"
-import type { ConnStatus } from "@/lib/gmail"
-import type { AdminConfig, InboxItem } from "@/lib/admin"
+import type { OutboxItem, PublicSettings } from "@/lib/cloud"
+import type { ConnStatus, GoogleArea } from "@/lib/google"
 
 export type Tab = "log" | "summary" | "invoices" | "services" | "account" | "admin"
 export type EmailKind = "invoice" | "followup"
+export type Me = { uid: string; email: string; name: string; emailVerified: boolean; viaGoogle: boolean }
 
 export type AskOptions = {
   title: string
@@ -19,8 +18,7 @@ export type AskOptions = {
 
 export type AppApi = {
   data: Data
-  conn: Connection
-  session: Session
+  me: Me
   /** Apply a change, save it, optionally toast. */
   commit: (fn: (d: Data) => void, message?: string) => void
   replaceAll: (d: Data, message?: string) => void
@@ -29,20 +27,20 @@ export type AppApi = {
   viewInvoice: (id: string, justCreated?: boolean) => void
   email: (id: string, kind: EmailKind) => void
   showFollowUps: () => void
+  openFeedback: () => void
   logOut: () => void
   accountDeleted: () => void
-  canSave: boolean
-  gmail: ConnStatus
-  refreshGmail: () => Promise<ConnStatus>
-  calendar: ConnStatus
-  refreshCalendar: () => Promise<ConnStatus>
-  /** The owner's admin settings, if the owner has turned admin tools on. */
-  cfg: AdminConfig | null
-  setCfg: (c: AdminConfig | null) => void
-  /** This viewer's requests to the admin (queued emails, resets, feedback). */
-  myItems: InboxItem[]
-  refreshItems: () => Promise<void>
-  openFeedback: () => void
+  /** Connection state of this person's Google services on this device. */
+  google: Record<GoogleArea, ConnStatus>
+  /** Connect a Google service (call from a click). Resolves true when connected. */
+  connect: (area: GoogleArea) => Promise<boolean>
+  disconnectGoogle: () => void
+  isAdmin: boolean
+  settings: PublicSettings | null
+  setSettings: (s: PublicSettings | null) => void
+  /** Emails this person queued to go out from the admin's Gmail. */
+  outbox: OutboxItem[]
+  refreshOutbox: () => Promise<void>
 }
 
 export const AppCtx = createContext<AppApi | null>(null)

@@ -5,9 +5,10 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc -b && vite build",
-    "lint": "oxlint",
-    "preview": "vite preview"
+    "build": "tsc -p tsconfig.app.json --noEmit && vite build",
+    "preview": "vite preview",
+    "emulators": "firebase emulators:start --project demo-tracker",
+    "deploy:rules": "firebase deploy --only firestore:rules"
   },
   "dependencies": {
     "@hookform/resolvers": "^7.0.7",
@@ -42,6 +43,7 @@
     "cmdk": "^1.1.1",
     "date-fns": "^4.4.0",
     "embla-carousel-react": "^8.6.0",
+    "firebase": "13.4.0",
     "lucide-react": "^1.76.0",
     "next-themes": "^0.4.6",
     "react": "^19.3.1",
@@ -56,23 +58,17 @@
     "zod": "^4.6.7"
   },
   "devDependencies": {
-    "@parcel/config-default": "^2.16.4",
     "@types/node": "^24.19.2",
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
     "@vitejs/plugin-react": "^6.1.2",
     "autoprefixer": "^10.6.2",
-    "html-inline": "^1.2.0",
+    "firebase-tools": "15.37.0",
     "oxlint": "^1.90.0",
-    "parcel": "^2.16.4",
-    "parcel-resolver-tspaths": "^0.0.9",
     "postcss": "^8.5.33",
     "tailwindcss": "3.4.1",
     "tailwindcss-animate": "^1.0.7",
     "typescript": "~7.0.2",
     "vite": "^8.3.6"
-  },
-  "@parcel/resolver-default": {
-    "packageExports": true
   }
 }

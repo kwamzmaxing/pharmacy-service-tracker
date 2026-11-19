@@ -1,0 +1,63 @@
+# Putting the tracker online
+
+About 20 minutes, all free. You need a Google account. Do the steps in order.
+
+## 1. Create the Firebase project
+
+1. Go to <https://console.firebase.google.com> and choose **Create a project**. Call it something like `pharmacy-tracker`. Google Analytics isn't needed.
+2. On the project page, click the **Web** icon (`</>`) to add a web app. Give it a name, leave Firebase Hosting unticked, and click **Register app**.
+3. Copy the `firebaseConfig` values it shows into `src/config.ts`.
+
+## 2. Turn on logins
+
+1. **Build → Authentication → Get started**.
+2. Under **Sign-in method**, enable **Email/Password**, then **Google** (pick your email as the support email).
+3. Under **Settings → Authorized domains**, add `kwamzmaxing.github.io`.
+4. Under **Templates → Password reset**, set the sender name (for example "Service Tracker") and put your own email as the **Reply-to** address, so replies to reset emails reach you.
+
+## 3. Create the database
+
+1. **Build → Firestore Database → Create database**. Choose **Production mode** and the location `europe-west2 (London)`.
+2. Open the **Rules** tab, replace everything with the contents of `firestore.rules` from this repository, and click **Publish**.
+
+## 4. Let people connect Gmail and Calendar
+
+Use the same project in Google Cloud: <https://console.cloud.google.com> (choose your Firebase project at the top).
+
+1. **APIs & Services → Library**: enable **Gmail API**, **Google Calendar API** and **Google Sheets API**.
+2. **Google Auth Platform → Branding** (or **OAuth consent screen**): app name "Service Tracker", your email as support and developer contact, and the site address `https://kwamzmaxing.github.io/pharmacy-service-tracker/` as the home page.
+3. **Data access → Add or remove scopes**: add `.../auth/gmail.send`, `.../auth/calendar.events` and `.../auth/drive.file`.
+4. **Audience**: leave it in **Testing** for now and add the Gmail addresses of the people who will use it as **Test users** (up to 100).
+5. **Clients → Create client → Web application**. Under **Authorized JavaScript origins** add `https://kwamzmaxing.github.io`. Copy the **Client ID** into `googleClientId` in `src/config.ts`.
+
+While the app is in Testing, Google shows people a "Google hasn't verified this app" screen; they click **Continue**. To remove it and allow more than 100 people, choose **Publish app** and complete Google's verification (it asks for a privacy policy page and can take a few weeks).
+
+## 5. Publish the site
+
+1. In this GitHub repository, open **Settings → Pages** and set **Source** to **GitHub Actions**.
+2. Commit the filled-in `src/config.ts` to the `main` branch. The **Publish site** workflow builds and publishes the site to <https://kwamzmaxing.github.io/pharmacy-service-tracker/>.
+
+## 6. Make yourself the admin
+
+1. Open the site, create your account, and copy the **User ID** shown on the **Account** tab.
+2. In Firebase: **Firestore Database → Start collection**. Collection ID `admins`; Document ID = your User ID; add one field (`role`, string, `admin`) and save.
+3. Reload the site. You'll see the **Admin** tab. Set the name account holders see.
+
+## 7. Invite people
+
+Send them the site link. They create an account (or use **Continue with Google**), then connect Gmail and Calendar from the **Account** tab. If they used the earlier claude.ai version, they can bring their data across with **Account → Your data → Restore from file** using a back-up from that version.
+
+## Good to know
+
+- **Cost**: Firebase's free plan covers 50,000 reads and 20,000 writes a day, far more than this tracker needs.
+- **Privacy**: each person's tracker can only be read by them. The admin sees names, emails, log-in dates, feedback and emails sent through them, never anyone's invoices or passwords.
+- **Password resets** are sent by Firebase from `noreply@<your-project>.firebaseapp.com`, with your reply-to address. You can also send a reset link to anyone from the Admin tab.
+
+## Working on the code
+
+```bash
+pnpm install
+pnpm dev              # the site, using src/config.ts
+pnpm emulators        # local Firebase for testing (needs Java)
+VITE_USE_EMULATOR=1 pnpm dev   # the site against the local Firebase
+```

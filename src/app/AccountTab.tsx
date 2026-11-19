@@ -1,33 +1,36 @@
-import { useEffect, useRef, useState } from "react"
+import { useRef, useState } from "react"
 import { toast } from "sonner"
 import * as XLSX from "xlsx"
-import { CalendarDays, LogOut, Mail, MessageSquare } from "lucide-react"
-import { Switch } from "@/components/ui/switch"
+import {
+  deleteUser, EmailAuthProvider, GoogleAuthProvider, reauthenticateWithCredential, reauthenticateWithPopup, sendEmailVerification, updatePassword,
+} from "firebase/auth"
+import { CalendarDays, Copy, LogOut, Mail, MessageSquare } from "lucide-react"
 import { Label } from "@/components/ui/label"
 import { Button } from "@/components/ui/button"
+import { Switch } from "@/components/ui/switch"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import {
   entryAmt, invStatus, nextNumber, normalize, plural, today, uid, FOLLOW_UP_DAYS, FOLLOW_UP_REPEAT, TERMS_OPTIONS,
   type Data, type Entry, type Profile, type Terms,
 } from "@/lib/model"
+import { auth } from "@/lib/firebase"
+import { forgetPerson, wipeVault } from "@/lib/cloud"
 import { saveFile } from "@/lib/store"
-import { AuthError, changePassword, deleteAccount } from "@/lib/accounts"
-import { allowConnector, allowGmail, CALENDAR, GMAIL_HELP, type ConnStatus } from "@/lib/gmail"
-import { forgetAccount } from "@/lib/admin"
+import type { ConnStatus } from "@/lib/google"
 import { useApp } from "./ctx"
-import { AreaField, Callout, Field, Panel, Pill } from "./bits"
+import { AreaField, Field, Panel, Pill } from "./bits"
 
 const STATUS_LABEL = { paid: "Paid", unpaid: "Unpaid", overdue: "Overdue" }
+const connLabel = (s: ConnStatus) => ({ ready: "Connected", not_connected: "Not connected", unavailable: "Not set up" })[s]
+const connTone = (s: ConnStatus) => (s === "ready" ? "done" : s === "unavailable" ? "pending" : "overdue") as "done" | "pending" | "overdue"
 
 export function AccountTab() {
-  const { data, commit, conn, session, canSave, ask, replaceAll, logOut, accountDeleted, gmail, refreshGmail, calendar, refreshCalendar, cfg, openFeedback } = useApp()
+  const { data, commit, me, ask, replaceAll, logOut, accountDeleted, google, connect, disconnectGoogle, settings, isAdmin, openFeedback } = useApp()
   const p = data.profile
-  const cloud = conn.kv.kind === "cloud"
-  const canDownload = !!conn.downloads || !window.claude
   const restoreRef = useRef<HTMLInputElement>(null)
   const combineRef = useRef<HTMLInputElement>(null)
 
-  const set = (k: keyof Profile, v: string | number) => {
+  const set = (k: keyof Profile, v: string | number | boolean) => {
     if (p[k] === v) return
     commit((d) => void ((d.profile as Record<string, unknown>)[k] = v), "Saved ✓")
   }
@@ -46,65 +49,42 @@ export function AccountTab() {
       </Select>
     </div>
   )
-  const name = p.fullName || session.email
-  const tag = (p.fullName || session.email.split("@")[0] || "user").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "")
+  const name = p.fullName || me.name || me.email
+  const tag = (p.fullName || me.email.split("@")[0] || "user").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "")
+  const relay = !!settings?.relay && !isAdmin
 
   /* ---------- password ---------- */
   const [pwCur, setPwCur] = useState("")
   const [pwNew, setPwNew] = useState("")
   const [pwNew2, setPwNew2] = useState("")
   const [pwBusy, setPwBusy] = useState(false)
-  async function updatePassword(e: React.FormEvent) {
+  async function changePw(e: React.FormEvent) {
     e.preventDefault()
+    const u = auth.currentUser
+    if (!u?.email) return
     if (pwNew.length < 8) return toast.error("Use a new password of at least 8 characters.")
     if (pwNew !== pwNew2) return toast.error("The new passwords don’t match.")
     setPwBusy(true)
     try {
-      await changePassword(conn.kv, session, pwCur, pwNew)
+      await reauthenticateWithCredential(u, EmailAuthProvider.credential(u.email, pwCur))
+      await updatePassword(u, pwNew)
       setPwCur(""); setPwNew(""); setPwNew2("")
       toast.success("Password changed ✓")
     } catch (x) {
-      toast.error(x instanceof AuthError && x.code === "wrong_password" ? "Your current password isn’t right." : "The password couldn’t be changed. Check your connection.")
+      toast.error(/invalid-credential|wrong-password/.test((x as { code?: string })?.code || "") ? "Your current password isn’t right." : "The password couldn’t be changed. Check your connection.")
     } finally {
       setPwBusy(false)
     }
   }
-
-  /* ---------- Gmail ---------- */
-  const [gmailBusy, setGmailBusy] = useState(false)
-  useEffect(() => {
-    refreshGmail()
-    refreshCalendar()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
-  const [calBusy, setCalBusy] = useState(false)
-  async function connectCalendar() {
-    setCalBusy(true)
-    const ok = await allowConnector(conn.permissions, CALENDAR)
-    const st = await refreshCalendar()
-    setCalBusy(false)
-    if (!ok) toast.error(GMAIL_HELP.denied)
-    else if (st === "ready") toast.success("Google Calendar is ready. New invoices will add their payment date.")
-    else toast(GMAIL_HELP[st])
-  }
-  async function connectGmail() {
-    setGmailBusy(true)
-    const ok = await allowGmail(conn.permissions)
-    const st = await refreshGmail()
-    setGmailBusy(false)
-    if (!ok) toast.error(GMAIL_HELP.denied)
-    else if (st === "ready") toast.success("Gmail is ready. Invoices and follow-ups can now go to your Gmail drafts.")
-    else toast(GMAIL_HELP[st])
+  async function resendVerify() {
+    if (!auth.currentUser) return
+    try { await sendEmailVerification(auth.currentUser); toast("Verification email sent. Check your inbox.") } catch { toast.error("Couldn’t send it right now. Try again later.") }
   }
 
   /* ---------- files ---------- */
-  async function offer(fname: string, blob: Blob, ok: string) {
-    const r = await saveFile(conn, fname, blob)
-    if (r === "saved") toast.success(ok)
-    else if (r === "failed") toast.error("That file couldn’t be saved here.")
-  }
   function backup() {
-    offer(`pharmacy-tracker-${tag}-${today()}.json`, new Blob([JSON.stringify(data, null, 2)], { type: "application/json" }), "Back-up saved ✓")
+    saveFile(`pharmacy-tracker-${tag}-${today()}.json`, new Blob([JSON.stringify(data, null, 2)], { type: "application/json" }))
+    toast.success("Back-up saved ✓")
   }
   function excel() {
     if (!data.entries.length && !data.invoices.length) return toast("Nothing to export yet.")
@@ -130,8 +110,8 @@ export function AccountTab() {
     XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(log), "Log")
     XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(summary), "Summary")
     if (invs.length) XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(invs), "Invoices")
-    const out = XLSX.write(wb, { bookType: "xlsx", type: "array" })
-    offer(`pharmacy-services-${tag}-${today()}.xlsx`, new Blob([out]), "Excel file saved ✓")
+    XLSX.writeFile(wb, `pharmacy-services-${tag}-${today()}.xlsx`)
+    toast.success("Excel file saved ✓")
   }
   async function restore(file: File) {
     try {
@@ -173,61 +153,73 @@ export function AccountTab() {
   async function removeAccount() {
     const ok = await ask({
       title: "Delete account",
-      message: `This permanently deletes the account ${session.email} and all its entries, invoices and details${cloud ? ", on every device" : ""}.`,
-      ok: "Delete account",
-      danger: true,
-      typeToConfirm: "DELETE",
+      message: `This permanently deletes the account ${me.email} and all its entries, invoices and details, on every device.`,
+      ok: "Delete account", danger: true, typeToConfirm: "DELETE",
     })
     if (!ok) return
+    const u = auth.currentUser
+    if (!u) return
     try {
-      await deleteAccount(conn.kv, session)
-      if (conn.uid) await forgetAccount(conn.kv, conn.uid, session.id).catch(() => {})
+      await wipeVault(u.uid)
+      await forgetPerson(u.uid).catch(() => {})
+      try {
+        await deleteUser(u)
+      } catch (x) {
+        if (!/requires-recent-login/.test((x as { code?: string })?.code || "")) throw x
+        // Firebase asks for a fresh log-in before deleting an account
+        if (me.viaGoogle) await reauthenticateWithPopup(u, new GoogleAuthProvider())
+        else {
+          const pw = window.prompt("To delete your account, enter your password once more:")
+          if (!pw) return toast("Your data was deleted, but the account is still there. Try again to remove it.")
+          await reauthenticateWithCredential(u, EmailAuthProvider.credential(u.email || "", pw))
+        }
+        await deleteUser(u)
+      }
       accountDeleted()
     } catch {
       toast.error("The account couldn’t be deleted. Check your connection and try again.")
     }
   }
-
-  const tone = (s: ConnStatus) => (s === "ready" ? "done" : s === "unavailable" ? "pending" : "overdue")
-  const label = (s: ConnStatus) => ({ ready: "Connected", not_connected: "Not connected", needs_reauth: "Reconnect needed", denied: "Turned off", unavailable: "Unavailable" })[s]
-  const gmailTone = tone(gmail), gmailLabel = label(gmail)
-  const relay = !!cfg?.relay && !!conn.uid && !conn.isOwner
+  async function copyUid() {
+    try { await navigator.clipboard.writeText(me.uid); toast("User ID copied") } catch { toast(me.uid) }
+  }
 
   return (
     <div className="grid gap-4">
-      <Panel title="Logged in" aside={cloud ? (canSave ? "saved online" : "changes not saving") : "saved in this browser"}>
+      <Panel title="Logged in" aside={me.viaGoogle ? "with Google" : me.emailVerified ? "email verified" : "email not verified yet"}>
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="min-w-0">
             <div className="truncate text-[15px] font-semibold">{name}</div>
-            <div className="truncate text-[12.5px] text-muted-foreground">{session.email}</div>
+            <div className="truncate text-[12.5px] text-muted-foreground">{me.email}</div>
           </div>
           <Button variant="outline" onClick={logOut}><LogOut /> Log out</Button>
         </div>
-        <p className="mt-2 max-w-[62ch] text-[12.5px] text-muted-foreground">
-          Log out to switch to a different account. {cloud ? "Your data is locked with your password and saved online, so you can log in from any device that opens this page." : ""}
+        <p className="mt-2 max-w-[62ch] text-[12.5px] text-muted-foreground">Log out to switch to a different account. Your tracker is saved online: log in on any phone or computer to see it.</p>
+        {!me.viaGoogle && !me.emailVerified && (
+          <p className="mt-2 text-[12.5px] text-muted-foreground">Please confirm your email so password resets reach you. <button type="button" className="font-semibold text-brand-ink hover:underline" onClick={resendVerify}>Resend the confirmation email</button></p>
+        )}
+        <p className="mt-2 text-[12px] text-muted-foreground">
+          User ID <code className="rounded bg-secondary px-1.5 py-0.5">{me.uid}</code>{" "}
+          <button type="button" aria-label="Copy user ID" className="inline-flex translate-y-0.5 items-center text-brand-ink" onClick={copyUid}><Copy className="size-3.5" /></button>
         </p>
-        {!canSave && <div className="mt-3"><Callout>Your changes can’t be saved because you only have view access to this page. Ask the person who shared it for Contributor access.</Callout></div>}
       </Panel>
 
-      <Panel title="Email" aside={<Pill tone={gmailTone}>{gmailLabel}</Pill>}>
+      <Panel title="Email" aside={<Pill tone={connTone(google.gmail)}>{connLabel(google.gmail)}</Pill>}>
         <div className="grid gap-4">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <p className="max-w-[56ch] text-[13px] text-muted-foreground">
-              Connect Gmail to put invoice emails and follow-ups straight into your Gmail drafts, ready to send.
-              {gmail !== "ready" && gmail !== "unavailable" && <> {GMAIL_HELP[gmail]}</>}
-              {gmail === "unavailable" && <> {GMAIL_HELP.unavailable} You can still copy each email and paste it.</>}
+              {google.gmail === "unavailable"
+                ? "Gmail sending isn’t set up on this site yet. You can still copy each email, or open it in your email app."
+                : "Connect your Gmail to send invoices and follow-ups straight from your own address, with the invoice attached. Google asks you to agree once."}
             </p>
-            {gmail !== "unavailable" && (
-              <Button variant={gmail === "ready" ? "outline" : "default"} disabled={gmailBusy} onClick={gmail === "denied" ? () => conn.permissions?.manage().then(refreshGmail).catch(() => toast(GMAIL_HELP.denied)) : connectGmail}>
-                <Mail /> {gmail === "ready" ? "Check connection" : gmail === "denied" ? "Open permissions" : "Connect Gmail"}
-              </Button>
-            )}
+            {google.gmail === "not_connected" && <Button onClick={() => connect("gmail")}><Mail /> Connect Gmail</Button>}
+            {google.gmail === "ready" && <Button variant="outline" onClick={disconnectGoogle}>Disconnect Google</Button>}
           </div>
           {relay && (
             <div className="grid gap-1.5">
               <span className="text-xs font-semibold text-muted-foreground">Send invoice and follow-up emails from</span>
               <div role="radiogroup" aria-label="Send emails from" className="grid gap-2 sm:grid-cols-2">
-                {([["mine", "My own Gmail", "Sent straight away, from your address."], ["admin", `${cfg?.adminName || "The admin"}’s email`, "Queued and sent from their Gmail."]] as const).map(([v, t, d]) => (
+                {([["mine", "My own Gmail", "Sent straight away, from your address."], ["admin", `${settings?.adminName || "The admin"}’s email`, "Queued and sent from their Gmail."]] as const).map(([v, t, d]) => (
                   <button key={v} type="button" role="radio" aria-checked={p.sendVia === v} onClick={() => set("sendVia", v)}
                     className={`rounded-[10px] border px-3.5 py-2.5 text-left text-[13px] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${p.sendVia === v ? "border-primary bg-accent" : "bg-field"}`}>
                     <span className="block font-semibold">{t}</span>
@@ -245,22 +237,18 @@ export function AccountTab() {
         </div>
       </Panel>
 
-      <Panel title="Calendar" aside={<Pill tone={tone(calendar)}>{label(calendar)}</Pill>}>
+      <Panel title="Calendar" aside={<Pill tone={connTone(google.calendar)}>{connLabel(google.calendar)}</Pill>}>
         <div className="grid gap-3">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <p className="max-w-[56ch] text-[13px] text-muted-foreground">
               Put each invoice’s expected payment date in your Google Calendar, so you know when money should arrive.
-              {calendar !== "ready" && calendar !== "unavailable" && <> {GMAIL_HELP[calendar]} Until then, each invoice has an “Add to Google Calendar” link.</>}
+              {google.calendar !== "ready" && " Without connecting, every invoice still has an “Add to Google Calendar” link."}
             </p>
-            {calendar !== "unavailable" && calendar !== "ready" && (
-              <Button disabled={calBusy} onClick={calendar === "denied" ? () => conn.permissions?.manage().then(refreshCalendar).catch(() => toast(GMAIL_HELP.denied)) : connectCalendar}>
-                <CalendarDays /> {calendar === "denied" ? "Open permissions" : "Connect Google Calendar"}
-              </Button>
-            )}
+            {google.calendar === "not_connected" && <Button onClick={() => connect("calendar")}><CalendarDays /> Connect Google Calendar</Button>}
           </div>
           <div className="flex items-center justify-between gap-3">
             <label htmlFor="p-calendar" className="text-[13px]">Add the payment date automatically when I create an invoice</label>
-            <Switch id="p-calendar" checked={!!p.calendar} onCheckedChange={(v) => commit((d) => void (d.profile.calendar = v), "Saved ✓")} />
+            <Switch id="p-calendar" checked={!!p.calendar} onCheckedChange={(v) => set("calendar", v)} />
           </div>
         </div>
       </Panel>
@@ -298,37 +286,37 @@ export function AccountTab() {
         </div>
       </Panel>
 
-      <Panel title="Change password">
-        <form onSubmit={updatePassword} className="grid gap-3">
-          <input type="email" autoComplete="username" value={session.email} readOnly hidden />
-          <div className="grid gap-3 sm:grid-cols-3">
-            <Field id="pw-cur" label="Current password" type="password" autoComplete="current-password" value={pwCur} onChange={(e) => setPwCur(e.target.value)} />
-            <Field id="pw-new" label="New password" type="password" autoComplete="new-password" value={pwNew} onChange={(e) => setPwNew(e.target.value)} />
-            <Field id="pw-new2" label="Confirm new password" type="password" autoComplete="new-password" value={pwNew2} onChange={(e) => setPwNew2(e.target.value)} />
-          </div>
-          <div><Button type="submit" variant="outline" disabled={pwBusy || !pwCur || !pwNew}>{pwBusy ? "Changing…" : "Change password"}</Button></div>
-        </form>
-      </Panel>
+      {!me.viaGoogle && (
+        <Panel title="Change password">
+          <form onSubmit={changePw} className="grid gap-3">
+            <input type="email" autoComplete="username" value={me.email} readOnly hidden />
+            <div className="grid gap-3 sm:grid-cols-3">
+              <Field id="pw-cur" label="Current password" type="password" autoComplete="current-password" value={pwCur} onChange={(e) => setPwCur(e.target.value)} />
+              <Field id="pw-new" label="New password" type="password" autoComplete="new-password" value={pwNew} onChange={(e) => setPwNew(e.target.value)} />
+              <Field id="pw-new2" label="Confirm new password" type="password" autoComplete="new-password" value={pwNew2} onChange={(e) => setPwNew2(e.target.value)} />
+            </div>
+            <div><Button type="submit" variant="outline" disabled={pwBusy || !pwCur || !pwNew}>{pwBusy ? "Changing…" : "Change password"}</Button></div>
+          </form>
+        </Panel>
+      )}
 
       <Panel title="Your data">
         <p className="mb-3 max-w-[62ch] text-[13px] text-muted-foreground">
-          {cloud ? "Your data is saved online. A back-up file is an extra copy you keep yourself, and the only way back in if you forget your password." : "Back up regularly: if this browser’s storage is cleared, a back-up file brings everything back."}{" "}
-          Combine merges daily back-up files into this account without counting an entry twice.
+          Your tracker is saved online. A back-up file is an extra copy you keep yourself. Combine merges daily back-up files, including ones from the earlier claude.ai version, without counting an entry twice.
         </p>
         <div className="flex flex-wrap gap-2">
-          {canDownload && <Button onClick={excel}>Export to Excel</Button>}
-          {canDownload && <Button variant="outline" onClick={backup}>Back up to file</Button>}
+          <Button onClick={excel}>Export to Excel</Button>
+          <Button variant="outline" onClick={backup}>Back up to file</Button>
           <Button variant="outline" onClick={() => restoreRef.current?.click()}>Restore from file</Button>
           <Button variant="outline" onClick={() => combineRef.current?.click()}>Combine back-ups</Button>
           <input ref={restoreRef} id="restore-input" type="file" accept="application/json,.json" hidden onChange={(e) => { const f = e.target.files?.[0]; if (f) restore(f); e.target.value = "" }} />
           <input ref={combineRef} id="combine-input" type="file" accept="application/json,.json" multiple hidden onChange={(e) => { const fs = [...(e.target.files || [])]; if (fs.length) combine(fs); e.target.value = "" }} />
         </div>
-        {!canDownload && <p className="mt-2.5 text-[12.5px] text-muted-foreground">File downloads aren’t allowed on this page, so Excel export and back-ups are unavailable.</p>}
       </Panel>
 
       <Panel title="Feedback">
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <p className="max-w-[56ch] text-[13px] text-muted-foreground">Tell {cfg?.adminName || "the person who runs this tracker"} what’s working, what isn’t, or what you’d like added.</p>
+          <p className="max-w-[56ch] text-[13px] text-muted-foreground">Tell {settings?.adminName || "the person who runs this tracker"} what’s working, what isn’t, or what you’d like added.</p>
           <Button variant="outline" onClick={openFeedback}><MessageSquare /> Send feedback</Button>
         </div>
       </Panel>

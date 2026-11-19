@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react"
+import { useEffect, useState } from "react"
 import { toast } from "sonner"
 import { AlertTriangle, CalendarDays, Copy, Download, Inbox, Mail, Printer, Send, Star } from "lucide-react"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
@@ -12,14 +12,13 @@ import {
   daysBetween, fmtDate, followUpsDue, invStatus, invoiceEmailText, isoOf, money, plural, reminderText, today, type Data, type Invoice,
 } from "@/lib/model"
 import { saveFile } from "@/lib/store"
-import { addCalendarEvent, calendarLink, createDraft, GmailError, GMAIL_HELP, sendMail } from "@/lib/gmail"
-import { postItem } from "@/lib/admin"
+import { queueEmail, sendFeedback } from "@/lib/cloud"
+import { addCalendarEvent, calendarLink, GOOGLE_HELP, GoogleError, sendMail } from "@/lib/google"
 import { useApp, type AskOptions, type EmailKind } from "./ctx"
 import { InvoiceDoc, invoiceFile } from "./invoice"
 import { Pill } from "./bits"
 
 const STATUS_LABEL = { paid: "Paid", unpaid: "Unpaid", overdue: "Overdue" } as const
-const inClaude = () => !!window.claude
 
 /* ---------- confirm ---------- */
 export function ConfirmDialog({ req: live, onDone }: { req: AskOptions | null; onDone: (ok: boolean) => void }) {
@@ -66,46 +65,33 @@ export function invoiceAttachment(inv: Invoice) {
 }
 const calDetails = (inv: Invoice) => `Expected payment for ${inv.number} from ${inv.to.name || "the pharmacy"}: ${money(inv.total)}. Logged in Service Tracker.`
 const calTitle = (inv: Invoice) => `Payment due: ${inv.number} · ${money(inv.total)}`
+const googleMsg = (e: unknown) => {
+  const k = e instanceof GoogleError ? e.kind : "failed"
+  return GOOGLE_HELP[k] + (e instanceof Error && e.message && e.message !== k ? ` ${e.message}` : "")
+}
 
 export function InvoiceDialog({ id, justCreated, onClose }: { id: string | null; justCreated: boolean; onClose: () => void }) {
-  const { data, conn, email, calendar, commit } = useApp()
+  const { data, me, email, google, commit } = useApp()
   const inv = id ? data.invoices.find((i) => i.id === id) : null
   const st = inv ? invStatus(inv) : "unpaid"
-  const canPrint = !inClaude()
-  const canDownload = !!conn.downloads || !inClaude()
   const [calBusy, setCalBusy] = useState(false)
-  const tried = useRef<string | null>(null)
 
-  async function addToCalendar(quiet = false) {
+  async function addToCalendar() {
     if (!inv) return
-    if (calendar !== "ready") {
-      if (!quiet) window.open(calendarLink(calTitle(inv), inv.due, calDetails(inv)), "_blank", "noopener")
-      return
-    }
     setCalBusy(true)
     try {
-      await addCalendarEvent(conn.mcp, { title: calTitle(inv), date: inv.due, details: calDetails(inv) })
+      await addCalendarEvent({ title: calTitle(inv), date: inv.due, details: calDetails(inv) }, me.email)
       commit((d) => void (d.invoices.find((x) => x.id === inv.id)!.calendarAt = new Date().toISOString()), `Added ${fmtDate(inv.due)} to your Google Calendar ✓`)
     } catch (e) {
-      const k = e instanceof GmailError ? e.kind : "failed"
-      if (!quiet || k !== "not_allowed") toast.error("Couldn’t add it to Google Calendar. " + GMAIL_HELP[k] + " Use the calendar link instead.")
+      if (!(e instanceof GoogleError && e.kind === "cancelled")) toast.error("Couldn’t add it to Google Calendar. " + googleMsg(e))
     } finally {
       setCalBusy(false)
     }
   }
-  // When a new invoice is made, put its due date in the calendar if the account holder asked for that
-  useEffect(() => {
-    if (!inv || !justCreated || inv.calendarAt || !data.profile.calendar || calendar !== "ready" || tried.current === inv.id) return
-    tried.current = inv.id
-    addToCalendar(true)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [inv?.id, justCreated, calendar])
-
-  async function download() {
+  function download() {
     if (!inv) return
-    const r = await saveFile(conn, inv.number + ".html", invoiceFile(inv))
-    if (r === "saved") toast.success("Invoice saved. Open the file to print it or save it as a PDF.")
-    else if (r === "failed") toast.error("The invoice couldn’t be saved here.")
+    saveFile(inv.number + ".html", invoiceFile(inv))
+    toast.success("Invoice saved. Open the file to print it or save it as a PDF.")
   }
   function print() {
     if (!inv) return
@@ -115,6 +101,7 @@ export function InvoiceDialog({ id, justCreated, onClose }: { id: string | null;
     w.document.close()
     w.onload = () => w.print()
   }
+  const emailed = !!inv?.sentAt || inv?.sentVia === "admin"
   return (
     <Dialog open={!!inv} onOpenChange={(o) => !o && onClose()}>
       <DialogContent className="max-h-[90vh] max-w-[720px] overflow-y-auto rounded-[14px] p-5">
@@ -129,7 +116,7 @@ export function InvoiceDialog({ id, justCreated, onClose }: { id: string | null;
                 {inv.sentAt ? `emailed ${fmtDate(isoOf(new Date(inv.sentAt)))}` : inv.sentVia === "admin" ? "queued to send" : "not emailed yet"}
               </DialogDescription>
             </DialogHeader>
-            {justCreated && !inv.sentAt && inv.sentVia !== "admin" && (
+            {justCreated && !emailed && (
               <div className="flex flex-wrap items-center justify-between gap-3 rounded-[10px] bg-ok-tint px-3.5 py-3 text-[13px] text-brand-ink">
                 <span><b>Invoice saved.</b> Send it to {inv.to.name || "the pharmacy"} now?</span>
                 <Button size="sm" onClick={() => email(inv.id, "invoice")}><Send /> Email invoice</Button>
@@ -140,23 +127,22 @@ export function InvoiceDialog({ id, justCreated, onClose }: { id: string | null;
             </div>
             <div className="flex flex-wrap items-center gap-2 text-[12.5px] text-muted-foreground">
               <CalendarDays className="size-4" />
-              {inv.calendarAt ? <>Due date is in your Google Calendar.</> : <>Payment expected {fmtDate(inv.due)}.</>}
+              {inv.calendarAt ? <>Payment date is in your Google Calendar.</> : <>Payment expected {fmtDate(inv.due)}.</>}
               {!inv.calendarAt && st !== "paid" && (
-                calendar === "ready" ? (
-                  <Button size="sm" variant="ghost" className="h-7 px-2 text-brand-ink" disabled={calBusy} onClick={() => addToCalendar()}>{calBusy ? "Adding…" : "Add to Google Calendar"}</Button>
+                google.calendar === "ready" ? (
+                  <Button size="sm" variant="ghost" className="h-7 px-2 text-brand-ink" disabled={calBusy} onClick={addToCalendar}>{calBusy ? "Adding…" : "Add to Google Calendar"}</Button>
                 ) : (
                   <a className="font-semibold text-brand-ink hover:underline" href={calendarLink(calTitle(inv), inv.due, calDetails(inv))} target="_blank" rel="noopener noreferrer">Add to Google Calendar ↗</a>
                 )
               )}
             </div>
             <DialogFooter className="flex-col gap-2 sm:flex-row sm:items-center">
-              {!canPrint && <p className="mr-auto text-xs text-muted-foreground">{canDownload ? "To print, download the invoice and open the file." : "Printing isn’t available on this page."}</p>}
               <Button variant="outline" onClick={onClose}>Close</Button>
-              {canDownload && <Button variant="outline" onClick={download}><Download /> Download</Button>}
-              {canPrint && <Button variant="outline" onClick={print}><Printer /> Print</Button>}
-              {(!justCreated || inv.sentAt || inv.sentVia === "admin") && st !== "paid" && (
-                <Button onClick={() => email(inv.id, (inv.sentAt || inv.sentVia === "admin") && st === "overdue" ? "followup" : "invoice")}>
-                  <Send /> {(inv.sentAt || inv.sentVia === "admin") && st === "overdue" ? "Send follow-up" : inv.sentAt ? "Email again" : "Email invoice"}
+              <Button variant="outline" onClick={download}><Download /> Download</Button>
+              <Button variant="outline" onClick={print}><Printer /> Print</Button>
+              {(!justCreated || emailed) && st !== "paid" && (
+                <Button onClick={() => email(inv.id, emailed && st === "overdue" ? "followup" : "invoice")}>
+                  <Send /> {emailed && st === "overdue" ? "Send follow-up" : inv.sentAt ? "Email again" : "Email invoice"}
                 </Button>
               )}
             </DialogFooter>
@@ -177,9 +163,9 @@ async function copy(text: string, el?: HTMLTextAreaElement | HTMLInputElement | 
     return false
   }
 }
-type Route = "send" | "draft" | "admin" | "copy"
+type Route = "send" | "admin" | "copy"
 export function EmailDialog({ req, onClose, onBack }: { req: { id: string; kind: EmailKind } | null; onClose: () => void; onBack?: () => void }) {
-  const { data, commit, conn, gmail, go, refreshGmail, cfg, session, refreshItems } = useApp()
+  const { data, commit, me, google, connect, go, settings, isAdmin, refreshOutbox } = useApp()
   const inv = req ? data.invoices.find((i) => i.id === req.id) : null
   const kind = req?.kind ?? "invoice"
   const [to, setTo] = useState("")
@@ -188,8 +174,8 @@ export function EmailDialog({ req, onClose, onBack }: { req: { id: string; kind:
   const [attach, setAttach] = useState(true)
   const [busy, setBusy] = useState<Route | null>(null)
   const [note, setNote] = useState("")
-  const relay = !!cfg?.relay && !!conn.uid && !conn.isOwner
-  const mine = gmail === "ready"
+  const relay = !!settings?.relay && !isAdmin
+  const mine = google.gmail === "ready"
   const preferred: Route = data.profile.sendVia === "admin" && relay ? "admin" : mine ? "send" : relay ? "admin" : "copy"
   useEffect(() => {
     if (!inv) return
@@ -214,38 +200,34 @@ export function EmailDialog({ req, onClose, onBack }: { req: { id: string; kind:
       if (to && !d.profile.billToEmail) d.profile.billToEmail = to
     }, msg)
   }
-  const mail = () => ({ to: to.trim(), subject, body, attachments: attach && inv ? [invoiceAttachment(inv)] : undefined })
-
-  async function viaGmail(route: "send" | "draft") {
+  async function sendNow() {
+    if (!inv) return
     if (!to.trim()) return setNote("Add the pharmacy’s email address first.")
-    setBusy(route)
+    setBusy("send")
     setNote("")
     try {
-      if (route === "send") await sendMail(conn.mcp, mail())
-      else await createDraft(conn.mcp, mail())
-      record(route === "send" ? "gmail" : "draft", route === "send" ? `Sent to ${to.trim()} ✓` : "Saved to your Gmail drafts. Open Gmail and press Send.", route === "send")
+      await sendMail({ to: to.trim(), subject, body, attachments: attach ? [invoiceAttachment(inv)] : undefined }, me.email)
+      record("gmail", `Sent to ${to.trim()} ✓`, true)
       onClose()
     } catch (e) {
-      const k = e instanceof GmailError ? e.kind : "failed"
-      setNote(GMAIL_HELP[k] + (e instanceof GmailError && e.kind === "failed" && e.message !== "failed" ? ` (${e.message})` : ""))
-      if (k === "not_connected" || k === "needs_reauth") refreshGmail()
+      if (!(e instanceof GoogleError && e.kind === "cancelled")) setNote("Gmail didn’t send it. " + googleMsg(e))
     } finally {
       setBusy(null)
     }
   }
   async function viaAdmin() {
-    if (!inv || !conn.uid) return
+    if (!inv) return
     if (!to.trim()) return setNote("Add the pharmacy’s email address first.")
     setBusy("admin")
     try {
       const att = attach ? invoiceAttachment(inv) : undefined
-      await postItem(conn.kv, conn.uid, {
-        type: "email", kind, invoiceId: inv.id, invoiceNumber: inv.number, acctId: session.id, email: session.email,
-        name: data.profile.fullName || session.email, to: to.trim(), subject, body,
-        ...(att && att.content.length < 120_000 ? { attachment: att } : {}),
+      await queueEmail({
+        uid: me.uid, name: data.profile.fullName || me.name || me.email, email: me.email,
+        kind, invoiceId: inv.id, invoiceNumber: inv.number, to: to.trim(), subject, body,
+        ...(att && att.content.length < 700_000 ? { attachment: att } : {}),
       })
-      record("admin", `Queued. ${cfg?.adminName || "The admin"} will send it from their email.`, false)
-      refreshItems()
+      record("admin", `Queued. ${settings?.adminName || "The admin"} will send it from their email.`, false)
+      refreshOutbox()
       onClose()
     } catch {
       setNote("Couldn’t queue the email. Check your connection and try again.")
@@ -306,22 +288,21 @@ export function EmailDialog({ req, onClose, onBack }: { req: { id: string; kind:
                 </label>
               )}
             </div>
-            {!mine && !relay && (
-              <p className="rounded-[9px] bg-secondary px-3 py-2.5 text-[12.5px] text-muted-foreground">
-                {gmail === "unavailable" ? GMAIL_HELP.unavailable : <>Gmail isn’t connected. </>}
-                {gmail !== "unavailable" && (
-                  <button type="button" className="font-semibold text-brand-ink underline-offset-2 hover:underline" onClick={() => { onClose(); go("account") }}>Connect Gmail</button>
-                )}
+            {!mine && google.gmail !== "unavailable" && (
+              <p className="flex flex-wrap items-center gap-2 rounded-[9px] bg-secondary px-3 py-2.5 text-[12.5px] text-muted-foreground">
+                Connect your Gmail to send straight from here.
+                <button type="button" className="font-semibold text-brand-ink underline-offset-2 hover:underline" onClick={() => connect("gmail")}>Connect Gmail</button>
+                <span aria-hidden>·</span>
+                <button type="button" className="font-semibold text-brand-ink underline-offset-2 hover:underline" onClick={() => { onClose(); go("account") }}>Email settings</button>
               </p>
             )}
             {note && <p role="alert" className="rounded-[9px] bg-warn-tint px-3 py-2.5 text-[12.5px] text-warn">{note}</p>}
             <DialogFooter className="flex-wrap gap-2">
               <Button variant="ghost" onClick={onBack || onClose}>{onBack ? "Back" : "Cancel"}</Button>
-              {!inClaude() && <Button variant="outline" onClick={openEmailApp}><Mail /> Open in email app</Button>}
+              <Button variant="outline" onClick={openEmailApp}><Mail /> Email app</Button>
               <Button variant={v("copy")} onClick={copyMessage}><Copy /> Copy</Button>
-              {relay && <Button variant={v("admin")} disabled={!!busy} onClick={viaAdmin}><Inbox /> {busy === "admin" ? "Queueing…" : `Send from ${cfg?.adminName || "admin"}’s email`}</Button>}
-              {mine && <Button variant="outline" disabled={!!busy} onClick={() => viaGmail("draft")}>{busy === "draft" ? "Saving…" : "Save as draft"}</Button>}
-              {mine && <Button variant={v("send")} disabled={!!busy} onClick={() => viaGmail("send")}><Send /> {busy === "send" ? "Sending…" : "Send now"}</Button>}
+              {relay && <Button variant={v("admin")} disabled={!!busy} onClick={viaAdmin}><Inbox /> {busy === "admin" ? "Queueing…" : `Send from ${settings?.adminName || "admin"}’s email`}</Button>}
+              {mine && <Button variant={v("send")} disabled={!!busy} onClick={sendNow}><Send /> {busy === "send" ? "Sending…" : "Send now"}</Button>}
             </DialogFooter>
           </>
         )}
@@ -333,7 +314,7 @@ export function EmailDialog({ req, onClose, onBack }: { req: { id: string; kind:
 /* ---------- feedback ---------- */
 const TOPICS = ["Suggestion", "Something isn’t working", "Praise", "Other"]
 export function FeedbackDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
-  const { conn, session, data, cfg, refreshItems } = useApp()
+  const { me, data, settings } = useApp()
   const [topic, setTopic] = useState(TOPICS[0])
   const [rating, setRating] = useState(0)
   const [message, setMessage] = useState("")
@@ -341,11 +322,9 @@ export function FeedbackDialog({ open, onClose }: { open: boolean; onClose: () =
   useEffect(() => { if (open) { setTopic(TOPICS[0]); setRating(0); setMessage("") } }, [open])
   async function submit() {
     if (!message.trim()) return toast("Write a short message first.")
-    if (!conn.uid) return toast.error("Feedback needs you to be signed in to claude.ai.")
     setBusy(true)
     try {
-      await postItem(conn.kv, conn.uid, { type: "feedback", acctId: session.id, email: session.email, name: data.profile.fullName || session.email, topic, rating, message: message.trim() })
-      refreshItems()
+      await sendFeedback({ uid: me.uid, email: me.email, name: data.profile.fullName || me.name || me.email, topic, rating, message: message.trim() })
       toast.success("Thanks, your feedback was sent.")
       onClose()
     } catch {
@@ -359,7 +338,7 @@ export function FeedbackDialog({ open, onClose }: { open: boolean; onClose: () =
       <DialogContent className="max-h-[90vh] max-w-md overflow-y-auto rounded-[14px]">
         <DialogHeader>
           <DialogTitle className="font-display">Send feedback</DialogTitle>
-          <DialogDescription>Goes to {cfg?.adminName || "the person who runs this tracker"}, with your name and email so they can reply.</DialogDescription>
+          <DialogDescription>Goes to {settings?.adminName || "the person who runs this tracker"}, with your name and email so they can reply.</DialogDescription>
         </DialogHeader>
         <div className="grid gap-3">
           <div className="grid gap-1.5">

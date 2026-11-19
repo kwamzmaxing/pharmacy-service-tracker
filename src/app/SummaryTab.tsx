@@ -1,11 +1,12 @@
 import { useState } from "react"
 import { Button } from "@/components/ui/button"
+import { addCalendarEvent, hasToken } from "@/lib/google"
 import { draftInvoice, entryAmt, inRange, money, plural, rangeLabel, type Range, type RangeMode } from "@/lib/model"
 import { useApp } from "./ctx"
 import { Callout, Chips, Empty, Eyebrow, Field, Panel } from "./bits"
 
 export function SummaryTab() {
-  const { data, commit, ask, go, viewInvoice, session } = useApp()
+  const { data, commit, ask, go, viewInvoice, me, google } = useApp()
   const [range, setRange] = useState<Range>({ mode: "month", from: "", to: "" })
 
   const filtered = data.entries.filter((e) => inRange(range, e.date))
@@ -27,7 +28,7 @@ export function SummaryTab() {
   const missing = [!p.fullName && "your name", !p.billToName && "who to invoice", !(p.sortCode && p.accountNumber) && "bank details"].filter(Boolean)
 
   async function create() {
-    const inv = draftInvoice(data, range, data.profile.fullName || session.email)
+    const inv = draftInvoice(data, range, data.profile.fullName || me.name || me.email)
     if (!inv) return
     const ok = await ask({
       title: "Create invoice",
@@ -42,6 +43,12 @@ export function SummaryTab() {
       for (const e of d.entries) if (ids.has(e.id)) Object.assign(e, { invoiced: true, invoiceId: inv.id })
     }, `Invoice ${inv.number} saved ✓`)
     viewInvoice(inv.id, true)
+    // Put the payment date in Google Calendar straight away when it's connected and Google already gave access this visit
+    if (data.profile.calendar && google.calendar === "ready" && hasToken("calendar")) {
+      addCalendarEvent({ title: `Payment due: ${inv.number} · ${money(inv.total)}`, date: inv.due, details: `Expected payment for ${inv.number} from ${inv.to.name || "the pharmacy"}: ${money(inv.total)}.` }, me.email)
+        .then(() => commit((d) => void (d.invoices.find((x) => x.id === inv.id)!.calendarAt = new Date().toISOString()), `Added ${inv.due.split("-").reverse().join("/")} to your Google Calendar ✓`))
+        .catch(() => {})
+    }
   }
 
   return (

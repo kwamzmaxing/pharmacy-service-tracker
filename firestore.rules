@@ -1,0 +1,47 @@
+rules_version = '2';
+// Who can read and write what. Deploy with: npx firebase deploy --only firestore:rules
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() { return request.auth != null; }
+    function me(uid) { return signedIn() && request.auth.uid == uid; }
+    // You make someone an admin by creating admins/<their user ID> in the Firebase console.
+    function isAdmin() { return signedIn() && exists(/databases/$(database)/documents/admins/$(request.auth.uid)); }
+
+    // The person's name/email for the admin list; only they can change it.
+    match /users/{uid} {
+      allow read: if me(uid) || isAdmin();
+      allow create, update: if me(uid)
+        && request.resource.data.keys().hasOnly(['name', 'email', 'created', 'lastLogin']);
+      allow delete: if me(uid);
+
+      // The person's tracker: nobody else, not even the admin, can read it.
+      match /docs/{docId} {
+        allow read, write: if me(uid);
+      }
+    }
+
+    match /feedback/{id} {
+      allow create: if signedIn() && request.resource.data.uid == request.auth.uid
+        && request.resource.data.message is string && request.resource.data.message.size() < 5000;
+      allow read, delete: if isAdmin();
+    }
+
+    // Emails an account holder asks the admin to send from the admin's Gmail.
+    match /outbox/{id} {
+      allow create: if signedIn() && request.resource.data.uid == request.auth.uid && request.resource.data.status == 'new';
+      allow read: if isAdmin() || (signedIn() && resource.data.uid == request.auth.uid);
+      allow update, delete: if isAdmin();
+    }
+
+    match /admins/{uid} {
+      allow read: if me(uid);
+      allow write: if false;
+    }
+
+    // Admin name and switches; everyone can read them.
+    match /settings/public {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+  }
+}
