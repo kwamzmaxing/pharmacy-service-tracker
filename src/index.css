@@ -1,0 +1,127 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Layout: one narrow column of working cards under a sticky green header; summary figures before detail. */
+@layer base {
+  :root {
+    --background: 150 14% 94%;
+    --foreground: 158 19% 11%;
+    --card: 0 0% 100%;
+    --card-foreground: 158 19% 11%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 158 19% 11%;
+    --primary: 170 65% 20%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 150 12% 95%;
+    --secondary-foreground: 158 19% 11%;
+    --muted: 150 12% 95%;
+    --muted-foreground: 157 8% 40%;
+    --accent: 160 22% 92%;
+    --accent-foreground: 170 65% 20%;
+    --destructive: 0 50% 46%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 150 13% 88%;
+    --input: 150 13% 86%;
+    --ring: 170 65% 26%;
+    --radius: 0.6rem;
+    --brand-ink: 170 65% 20%;
+    --field: 150 14% 97.5%;
+    --header: 170 65% 20%;
+    --header-fg: 160 30% 95%;
+    --header-muted: 160 25% 78%;
+    --warn: 36 76% 32%;
+    --warn-tint: 39 66% 92%;
+    --danger-ink: 0 50% 42%;
+    --danger-tint: 6 60% 94%;
+    --ok-tint: 160 25% 92%;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --background: 155 17% 7%;
+      --foreground: 150 15% 90%;
+      --card: 155 15% 11%;
+      --card-foreground: 150 15% 90%;
+      --popover: 155 15% 12%;
+      --popover-foreground: 150 15% 90%;
+      --primary: 168 57% 27%;
+      --primary-foreground: 0 0% 100%;
+      --secondary: 155 12% 15%;
+      --secondary-foreground: 150 15% 90%;
+      --muted: 155 12% 15%;
+      --muted-foreground: 155 9% 64%;
+      --accent: 168 40% 16%;
+      --accent-foreground: 166 50% 70%;
+      --destructive: 0 55% 45%;
+      --destructive-foreground: 0 0% 100%;
+      --border: 155 12% 19%;
+      --input: 155 12% 22%;
+      --ring: 166 50% 60%;
+      --brand-ink: 166 50% 66%;
+      --field: 155 17% 8.5%;
+      --header: 168 57% 20%;
+      --header-fg: 160 30% 95%;
+      --header-muted: 160 22% 76%;
+      --warn: 38 72% 63%;
+      --warn-tint: 38 42% 15%;
+      --danger-ink: 4 70% 74%;
+      --danger-tint: 5 33% 16%;
+      --ok-tint: 166 35% 15%;
+      color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"] {
+    --background: 155 17% 7%;
+    --foreground: 150 15% 90%;
+    --card: 155 15% 11%;
+    --card-foreground: 150 15% 90%;
+    --popover: 155 15% 12%;
+    --popover-foreground: 150 15% 90%;
+    --primary: 168 57% 27%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 155 12% 15%;
+    --secondary-foreground: 150 15% 90%;
+    --muted: 155 12% 15%;
+    --muted-foreground: 155 9% 64%;
+    --accent: 168 40% 16%;
+    --accent-foreground: 166 50% 70%;
+    --destructive: 0 55% 45%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 155 12% 19%;
+    --input: 155 12% 22%;
+    --ring: 166 50% 60%;
+    --brand-ink: 166 50% 66%;
+    --field: 155 17% 8.5%;
+    --header: 168 57% 20%;
+    --header-fg: 160 30% 95%;
+    --header-muted: 160 22% 76%;
+    --warn: 38 72% 63%;
+    --warn-tint: 38 42% 15%;
+    --danger-ink: 4 70% 74%;
+    --danger-tint: 5 33% 16%;
+    --ok-tint: 166 35% 15%;
+    color-scheme: dark;
+  }
+}
+
+@layer base {
+  * { @apply border-border; }
+  html, body { background: hsl(var(--background)); color: hsl(var(--foreground)); }
+  body { @apply font-sans antialiased; margin: 0; }
+  /* paints the phone's status-bar band in the header colour */
+  body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); z-index: 45; background: hsl(var(--header)); }
+  h1, h2, h3 { text-wrap: balance; }
+  .num { font-variant-numeric: tabular-nums; }
+  @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
+}
+
+/* Centered column with the side gutter; used inside every full-width band. */
+.wrap { max-width: 780px; margin: 0 auto; padding-block: 0; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+
+/* The invoice document, used on screen and in downloaded files. */
+.inv { font-size: 13.5px; line-height: 1.45; color: hsl(var(--foreground)); }
+.inv .k { display:block; font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; color: hsl(var(--muted-foreground)); margin-bottom: 3px; }
+.inv table { width: 100%; border-collapse: collapse; }
+.inv th { text-align: left; font-size: 10.5px; text-transform: uppercase; letter-spacing: .06em; color: hsl(var(--muted-foreground)); border-bottom: 1px solid hsl(var(--border)); padding: 8px 6px; font-weight: 700; }
+.inv td { padding: 9px 6px; border-bottom: 1px solid hsl(var(--border)); }
+.inv .r { text-align: right; }
