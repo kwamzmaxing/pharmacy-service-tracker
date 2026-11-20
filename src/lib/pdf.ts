@@ -147,11 +147,16 @@ export function taxSummaryPdf(t: TaxSummary, who: string, opts: { scotland: bool
   if (t.miles > 0) row(`Mileage allowance (${Math.round(t.miles).toLocaleString("en-GB")} miles at HMRC rates)`, `-${money(t.mileage.amount)}`, false, 3)
   if (!t.byCategory.length && !t.miles) row("None recorded", money(0), false, 3)
   y += 1; rule(doc, y - 4); row("Taxable profit", money(t.profit), true)
+  if (t.property.income > 0) {
+    row(`Rental income (${t.property.count})`, money(t.property.income), false, 3)
+    row("Property allowance", `-${money(t.property.allowance)}`, false, 3)
+    row("Taxable rental profit (no NI)", money(t.property.taxable), true)
+  }
   section("Income tax")
   if (opts.otherIncome) row(`Employment income included for bands: ${money(opts.otherIncome)}`, "", false, 3)
   row(`Personal allowance`, money(t.tax.allowance), false, 3)
   for (const l of t.tax.lines) row(`${l.label} on ${money(l.amount)}`, money(l.tax), false, 3)
-  row("Income tax on your self-employment", money(t.incomeTaxDue), true)
+  row(t.property.income > 0 ? "Income tax on your self-employment and rent" : "Income tax on your self-employment", money(t.incomeTaxDue), true)
   section("National Insurance")
   if (!t.ni.lines.length) row("Profit below the Class 4 threshold", money(0), false, 3)
   for (const l of t.ni.lines) row(`${l.label} on ${money(l.amount)}`, money(l.tax), false, 3)
@@ -162,7 +167,8 @@ export function taxSummaryPdf(t: TaxSummary, who: string, opts: { scotland: bool
   const notes = [
     `Settings: ${opts.scotland ? "Scottish" : "England, Wales and Northern Ireland"} income tax rates; ${opts.basis === "cash" ? "cash basis (income counted when paid)" : "income counted when the work was done"}; vehicle: ${opts.vehicle}.`,
     "2026/27 rates: personal allowance £12,570; Class 4 National Insurance 6% on profits £12,570–£50,270 and 2% above; mileage 55p a mile for the first 10,000 business miles in a car or van, then 25p.",
-    "This is an estimate to help you plan. It is not tax advice and doesn’t include student loans, pension contributions, other income such as savings or property, or payments on account. Check your figures with HMRC or an accountant before filing.",
+    ...(t.property.income > 0 ? ["Rental income uses the £1,000 property allowance instead of actual rental expenses, and has no National Insurance. If your rental expenses are more than £1,000, claiming them instead would lower the tax."] : []),
+    "This is an estimate to help you plan. It is not tax advice and doesn’t include student loans, pension contributions, savings interest, dividends or payments on account. Check your figures with HMRC or an accountant before filing.",
   ]
   for (const n of notes) { const t2 = doc.splitTextToSize(n, R - L) as string[]; if (y + t2.length * 4 > 285) { doc.addPage(); y = 22 } doc.text(t2, L, y); y += t2.length * 4 + 2 }
   return doc

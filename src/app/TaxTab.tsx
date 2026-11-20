@@ -6,7 +6,7 @@ import { Label } from "@/components/ui/label"
 import { Switch } from "@/components/ui/switch"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { cn } from "@/lib/utils"
-import { categoryName, class4, fmtDate, incomeTax, mileageRates, money, taxSummary, taxYearsWithData, VEHICLES, type Vehicle } from "@/lib/model"
+import { categoryName, fmtDate, mileageRates, money, PROPERTY_ALLOWANCE, taxSummary, taxYearsWithData, yearTax, VEHICLES, type Vehicle } from "@/lib/model"
 import { saveFile } from "@/lib/store"
 import { useApp } from "./ctx"
 import { Chips, Ledger, MoneyField, Panel } from "./bits"
@@ -27,8 +27,11 @@ export function TaxTab() {
   const projProfit = canProject ? t.profit / t.elapsed : t.profit
   const other = Math.max(0, Number(p.otherIncome) || 0)
   const projTotal = canProject
-    ? Math.max(0, incomeTax(projProfit + other, !!p.scotland).tax - incomeTax(other, !!p.scotland).tax) + class4(projProfit).tax
+    ? yearTax({ trading: projProfit, property: t.property.income / t.elapsed, salary: other, scotland: !!p.scotland }).total
     : t.total
+  const rent = t.property.income > 0
+  // Salary logged on the Accounting tab but no yearly salary here: the tax bands would be wrong
+  const salaryLogged = !other && data.budget.incomes.some((x) => x.kind === "employment" && x.date >= t.year.from && x.date <= t.year.to)
   const monthsLeft = current ? Math.max(1, Math.round((1 - t.elapsed) * 12)) : 12
   const setAside = canProject ? projTotal / 12 : t.total / 12
   const rates = mileageRates(p.vehicle || "car", Number(t.year.from.slice(0, 4)))
@@ -78,8 +81,15 @@ export function TaxTab() {
             sub={!t.miles ? "No mileage logged in this tax year" : t.mileage.after
               ? `${Math.round(t.miles * 10) / 10} business miles: 10,000 at ${pence(rates.first)}, ${(Math.round(t.mileage.after * 10) / 10).toLocaleString("en-GB")} at ${pence(rates.after)}`
               : `${Math.round(t.miles * 10) / 10} business miles at ${pence(rates.first)} a mile`} />
-          <Row k="Taxable profit" v={t.profit} strong />
+          <Row k="Taxable profit" v={t.profit} strong sub={rent ? "From self-employment" : undefined} />
         </ul>
+        {rent && (
+          <ul className="mt-2 divide-y border-t text-[14px]">
+            <Row k={<button type="button" className="text-left hover:underline" onClick={() => go("budget")}>Rental income ({t.property.count})</button>} v={t.property.income} sub="Added on the Accounting tab" />
+            <Row k="Property allowance" v={t.property.allowance} minus sub={`The first ${money(PROPERTY_ALLOWANCE)} is tax-free. Used instead of rental expenses, which aren’t recorded here.`} />
+            <Row k="Taxable rental profit" v={t.property.taxable} strong sub="Income tax only: no National Insurance on rent" />
+          </ul>
+        )}
         <div className="mt-4 grid gap-4 sm:grid-cols-2">
           <div>
             <h3 className="mb-1 text-[11px] font-bold uppercase tracking-[0.08em] text-muted-foreground">Income tax</h3>
@@ -87,7 +97,7 @@ export function TaxTab() {
               {other > 0 && <li className="py-1.5 text-[12.5px] text-muted-foreground">Includes {money(other)} employment income, already taxed through PAYE</li>}
               <Row k="Personal allowance" v={t.tax.allowance} />
               {t.tax.lines.map((l) => <Row key={l.label} k={l.label} v={l.tax} sub={`on ${money(l.amount)}`} />)}
-              <Row k="On your self-employment" v={t.incomeTaxDue} strong />
+              <Row k={rent ? "On your self-employment and rent" : "On your self-employment"} v={t.incomeTaxDue} strong />
             </ul>
           </div>
           <div>
@@ -124,8 +134,11 @@ export function TaxTab() {
                 <SelectContent>{VEHICLES.map(([v, l]) => <SelectItem key={v} value={v}>{l}</SelectItem>)}</SelectContent>
               </Select>
             </div>
+            <div className="grid gap-1.5">
             <MoneyField key={"oi" + (p.otherIncome ?? 0)} id="t-other" label="Yearly salary from an employed job (if any)" defaultValue={p.otherIncome || ""} placeholder="0"
               onBlur={(e) => { const v = Math.max(0, parseFloat(e.target.value) || 0); if (v !== (p.otherIncome || 0)) set("otherIncome", v) }} />
+            {salaryLogged && <p className="text-[12.5px] text-warn">You’ve added salary on the Accounting tab. Put your yearly salary before tax here so your tax bands are right.</p>}
+            </div>
           </div>
           <div className="flex items-center justify-between gap-3">
             <label htmlFor="t-scot" className="text-[13.5px]">I live in Scotland <span className="block text-[12px] text-muted-foreground">Uses Scottish income tax bands; NI is the same everywhere.</span></label>
@@ -135,7 +148,7 @@ export function TaxTab() {
       </Panel>
 
       <p className="px-1 text-[12px] leading-relaxed text-muted-foreground">
-        An estimate to help you plan, using 2026/27 rates: personal allowance £12,570 (reduced above £100,000), Class 4 NI 6% on profits from £12,570 to £50,270 and 2% above, and HMRC mileage of 55p a mile for the first 10,000 business miles by car (25p after). It isn’t tax advice and leaves out student loans, pensions, savings, property income and payments on account. Self Assessment for {t.year.label} is due online by 31 January {Number(t.year.to.slice(0, 4)) + 1}.
+        An estimate to help you plan, using 2026/27 rates: personal allowance £12,570 (reduced above £100,000), Class 4 NI 6% on profits from £12,570 to £50,270 and 2% above, and HMRC mileage of 55p a mile for the first 10,000 business miles by car (25p after). Other self-employed work and rent added on the Accounting tab are included; rent uses the {money(PROPERTY_ALLOWANCE)} property allowance and has no NI. It isn’t tax advice and leaves out student loans, pensions, savings interest, dividends, rental expenses and payments on account. Self Assessment for {t.year.label} is due online by 31 January {Number(t.year.to.slice(0, 4)) + 1}.
       </p>
     </div>
   )

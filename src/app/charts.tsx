@@ -108,3 +108,53 @@ export function MonthlyBars({ points }: { points: MonthPoint[] }) {
     </div>
   )
 }
+
+/* ---------- budget pie ---------- */
+export type Slice = { id: string; label: string; value: number; color: string }
+/** Pots as a ring: a 2px gap between slices, hover or focus a slice (or its row) to read it in the middle. */
+export function Donut({ slices, total, centreLabel, active, onActive }: {
+  slices: Slice[]
+  total: number
+  centreLabel: string
+  active: string | null
+  onActive: (id: string | null) => void
+}) {
+  const size = 220, r = 100, inner = 70, c = size / 2
+  const sumV = slices.reduce((a, s) => a + Math.max(0, s.value), 0)
+  const point = (rad: number, a: number) => [c + rad * Math.sin(a), c - rad * Math.cos(a)]
+  let at = 0
+  const arcs = sumV > 0 ? slices.filter((s) => s.value > 0).map((s) => {
+    const frac = s.value / sumV
+    const a0 = at * 2 * Math.PI, a1 = (at + frac) * 2 * Math.PI
+    at += frac
+    if (frac >= 0.9999) {
+      // A full ring can't be one arc: draw two halves
+      const d = `M ${c} ${c - r} A ${r} ${r} 0 1 1 ${c} ${c + r} A ${r} ${r} 0 1 1 ${c} ${c - r} M ${c} ${c - inner} A ${inner} ${inner} 0 1 0 ${c} ${c + inner} A ${inner} ${inner} 0 1 0 ${c} ${c - inner} Z`
+      return { s, d }
+    }
+    const large = a1 - a0 > Math.PI ? 1 : 0
+    const [x0, y0] = point(r, a0), [x1, y1] = point(r, a1), [x2, y2] = point(inner, a1), [x3, y3] = point(inner, a0)
+    return { s, d: `M ${x0} ${y0} A ${r} ${r} 0 ${large} 1 ${x1} ${y1} L ${x2} ${y2} A ${inner} ${inner} 0 ${large} 0 ${x3} ${y3} Z` }
+  }) : []
+  const hot = slices.find((s) => s.id === active)
+  const pct = (v: number) => (sumV > 0 ? Math.round((v / sumV) * 100) : 0)
+  return (
+    <div className="relative mx-auto aspect-square w-full max-w-[260px]">
+      <svg viewBox={`0 0 ${size} ${size}`} className="size-full" role="img"
+        aria-label={`Split of ${money(total)}: ${slices.map((s) => `${s.label} ${pct(s.value)}%`).join(", ")}`}
+        onMouseLeave={() => onActive(null)}>
+        {!arcs.length && <circle cx={c} cy={c} r={(r + inner) / 2} fill="none" stroke="hsl(var(--secondary))" strokeWidth={r - inner} />}
+        {arcs.map(({ s, d }) => (
+          <path key={s.id} d={d} fill={s.color} fillRule="evenodd" stroke="hsl(var(--card))" strokeWidth={2} strokeLinejoin="round"
+            opacity={active && active !== s.id ? 0.35 : 1} className="cursor-pointer transition-opacity"
+            onMouseEnter={() => onActive(s.id)} onClick={() => onActive(active === s.id ? null : s.id)} />
+        ))}
+      </svg>
+      <div className="pointer-events-none absolute inset-[22%] flex flex-col items-center justify-center text-center" aria-live="polite">
+        <span className="line-clamp-2 text-[12px] leading-tight text-muted-foreground">{hot ? hot.label : centreLabel}</span>
+        <span className="num mt-1 font-display text-[clamp(17px,5vw,22px)] font-medium leading-tight">{money(hot ? hot.value : total)}</span>
+        {hot && <span className="mt-0.5 text-[12px] text-muted-foreground">{pct(hot.value)}%</span>}
+      </div>
+    </div>
+  )
+}

@@ -122,7 +122,46 @@ export type Invoice = {
   /** When a calendar reminder was added for the due date. */
   calendarAt?: string | null
 }
+/* ---------- budget (Accounting tab) ---------- */
+export type SaverStyle = "heavy" | "balanced" | "light" | "debt"
+export type PotKind = "tax" | "business" | "essentials" | "debt" | "emergency" | "savings" | "invest" | "spending" | "custom"
+/** One slice of the pie. `color` is a fixed palette slot (0–7) that stays with the pot. */
+export type Pot = { id: string; name: string; pct: number; color: number; kind: PotKind; why?: string }
+export type IncomeKind = "employment" | "selfemployed" | "rental" | "benefits" | "investment" | "gift" | "other"
+/** Money from somewhere other than an invoice. */
+export type OtherIncome = { id: string; date: string; amount: number; kind: IncomeKind; desc: string; setAsideTax: boolean }
+export type BudgetBasis = "month" | "last" | "avg3" | "own"
+export type Budget = {
+  /** Which split is in use. */
+  active: "suggested" | "custom"
+  style: SaverStyle
+  /** Monthly figures the suggested split works from. */
+  essentials: number
+  debt: number
+  emergencyDone: boolean
+  /** Which income the split is worked out from. */
+  basis: BudgetBasis
+  ownIncome: number
+  custom: Pot[]
+  incomes: OtherIncome[]
+  /** Pots ticked off as moved, by month (YYYY-MM). */
+  moved: Record<string, string[]>
+}
+export const defaultBudget = (): Budget => ({
+  active: "suggested", style: "balanced", essentials: 0, debt: 0, emergencyDone: false,
+  basis: "month", ownIncome: 0, custom: [], incomes: [], moved: {},
+})
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function normBudget(raw: any): Budget {
+  const b: Budget = Object.assign(defaultBudget(), raw && typeof raw === "object" ? raw : {})
+  b.custom = Array.isArray(b.custom) ? b.custom.slice(0, 8) : []
+  b.incomes = Array.isArray(b.incomes) ? b.incomes : []
+  b.moved = b.moved && typeof b.moved === "object" ? b.moved : {}
+  return b
+}
+
 export type Data = {
+  budget: Budget
   services: Service[]
   clients: Client[]
   journeys: Journey[]
@@ -204,7 +243,7 @@ export function newData(name = ""): Data {
   const profile = defaultProfile()
   profile.fullName = name
   profile.accountName = name
-  return { services: STD_SERVICES(), clients: [], journeys: [], expenses: [], entries: [], invoices: [], profile, meta: { ratesV: "d1", mileage: 1, clients: 1 } }
+  return { budget: defaultBudget(), services: STD_SERVICES(), clients: [], journeys: [], expenses: [], entries: [], invoices: [], profile, meta: { ratesV: "d1", mileage: 1, clients: 1 } }
 }
 /** Fill in anything missing, so old back-ups and older saved data still load. */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -240,6 +279,7 @@ export function normalize(raw: any): Data {
     meta.clients = 1
   }
   return {
+    budget: normBudget(d.budget),
     services,
     clients,
     journeys: Array.isArray(d.journeys) ? d.journeys : [],
@@ -421,6 +461,8 @@ export function buildDocs(d: Data): DocMap {
   const docs: DocMap = { core: { services: d.services, clients: d.clients, profile: d.profile, meta: d.meta, v: 2 } }
   // Journeys keep a route line each, so they get their own document instead of growing "core"
   if (d.journeys.length) docs.journeys = { journeys: d.journeys }
+  // The budget (pots and other income) has its own document too
+  docs.budget = { budget: d.budget }
   const monthKey = (date: string) => "m-" + (/^\d{4}-\d{2}/.test(date || "") ? date.slice(0, 7) : "other")
   for (const e of d.entries) ((docs[monthKey(e.date)] ??= { entries: [] }).entries as Entry[]).push(e)
   for (const x of d.expenses) {
@@ -433,7 +475,7 @@ export function buildDocs(d: Data): DocMap {
 export function assembleDocs(docs: DocMap): Data | null {
   const core = docs.core
   if (!core) return null
-  const d = { services: core.services, clients: core.clients, profile: core.profile, meta: core.meta || {}, journeys: (docs.journeys?.journeys as Journey[]) || [], entries: [] as Entry[], expenses: [] as Expense[], invoices: [] as Invoice[] }
+  const d = { services: core.services, clients: core.clients, profile: core.profile, meta: core.meta || {}, journeys: (docs.journeys?.journeys as Journey[]) || [], budget: docs.budget?.budget as Budget | undefined, entries: [] as Entry[], expenses: [] as Expense[], invoices: [] as Invoice[] }
   for (const k of Object.keys(docs).sort()) {
     if (k.startsWith("m-")) {
       d.entries.push(...((docs[k].entries as Entry[]) || []))
@@ -596,6 +638,22 @@ export function class4(profit: number) {
   return { lines, tax: lines.reduce((a, l) => a + l.tax, 0) }
 }
 
+/** Tax-free allowance on gross rental income (used instead of rental expenses, which aren't recorded). */
+export const PROPERTY_ALLOWANCE = 1000
+/**
+ * A year's income tax and Class 4 NI caused by self-employment and rent, on top of any salary.
+ * Rent is income tax only (no National Insurance); `extra` is other taxable income, also income tax only.
+ */
+export function yearTax(o: { trading: number; property: number; extra?: number; salary: number; scotland: boolean }) {
+  const trading = Math.max(0, o.trading), salary = Math.max(0, o.salary)
+  const propertyAllowance = Math.min(Math.max(0, o.property), PROPERTY_ALLOWANCE)
+  const propertyTaxable = Math.max(0, o.property - PROPERTY_ALLOWANCE)
+  const tax = incomeTax(salary + trading + propertyTaxable + Math.max(0, o.extra || 0), o.scotland)
+  const incomeTaxDue = Math.max(0, tax.tax - incomeTax(salary, o.scotland).tax)
+  const ni = class4(trading)
+  return { tax, incomeTaxDue, ni, propertyAllowance, propertyTaxable, total: incomeTaxDue + ni.tax }
+}
+
 export type TaxSummary = {
   year: ReturnType<typeof taxYear>
   income: number
@@ -604,9 +662,12 @@ export type TaxSummary = {
   byCategory: { category: ExpenseCategory; amount: number }[]
   miles: number
   mileage: ReturnType<typeof mileageAllowance>
+  /** Self-employment (trading) profit. */
   profit: number
+  /** Rental income received in the tax year (from the Accounting tab). */
+  property: { income: number; allowance: number; taxable: number; count: number }
   tax: ReturnType<typeof incomeTax>
-  /** Income tax caused by self-employment (on top of tax on other income). */
+  /** Income tax caused by self-employment and rent (on top of tax on a salary). */
   incomeTaxDue: number
   ni: ReturnType<typeof class4>
   total: number
@@ -625,6 +686,11 @@ export function taxSummary(d: Data, yearOf = today()): TaxSummary {
   } else {
     incomeLines.push({ label: "Work logged", amount: sum(d.entries.filter((e) => inYear(e.date)).map(entryAmt)) })
   }
+  // Other self-employed work and rent, added on the Accounting tab (counted when received)
+  const otherSE = d.budget.incomes.filter((x) => x.kind === "selfemployed" && inYear(x.date))
+  if (otherSE.length) incomeLines.push({ label: `Other self-employed work (${otherSE.length})`, amount: sum(otherSE.map((x) => Number(x.amount) || 0)) })
+  const rent = d.budget.incomes.filter((x) => x.kind === "rental" && inYear(x.date))
+  const rentIncome = sum(rent.map((x) => Number(x.amount) || 0))
   const income = sum(incomeLines.map((l) => l.amount))
   const ex = d.expenses.filter((x) => inYear(x.date))
   const cats: Record<string, number> = {}
@@ -636,17 +702,16 @@ export function taxSummary(d: Data, yearOf = today()): TaxSummary {
   const startYear = Number(ty.from.slice(0, 4))
   const mileage = mileageAllowance(miles, p.vehicle || "car", startYear)
   const profit = Math.max(0, income - expenses - mileage.amount)
-  const other = Math.max(0, Number(p.otherIncome) || 0)
-  const tax = incomeTax(profit + other, !!p.scotland)
-  const incomeTaxDue = Math.max(0, tax.tax - incomeTax(other, !!p.scotland).tax)
-  const ni = class4(profit)
+  const y = yearTax({ trading: profit, property: rentIncome, salary: Number(p.otherIncome) || 0, scotland: !!p.scotland })
+  const { tax, incomeTaxDue, ni } = y
+  const property = { income: rentIncome, allowance: y.propertyAllowance, taxable: y.propertyTaxable, count: rent.length }
   const t = today()
   const elapsed = t < ty.from ? 0 : t > ty.to ? 1 : Math.min(1, (daysBetween(ty.from, t) + 1) / 365)
-  return { year: ty, income, incomeLines, expenses, byCategory, miles, mileage, profit, tax, incomeTaxDue, ni, total: incomeTaxDue + ni.tax, elapsed }
+  return { year: ty, income, incomeLines, expenses, byCategory, miles, mileage, profit, property, tax, incomeTaxDue, ni, total: y.total, elapsed }
 }
 /** Tax years that have any activity, newest first (always includes the current one). */
 export function taxYearsWithData(d: Data) {
-  const dates = [...d.entries.map((e) => e.date), ...d.expenses.map((x) => x.date), ...d.invoices.map((i) => i.paidDate || i.issued), today()]
+  const dates = [...d.entries.map((e) => e.date), ...d.expenses.map((x) => x.date), ...d.invoices.map((i) => i.paidDate || i.issued), ...d.budget.incomes.map((x) => x.date), today()]
   const ys = new Map<string, ReturnType<typeof taxYear>>()
   for (const x of dates) if (x) { const y = taxYear(x); ys.set(y.from, y) }
   return [...ys.values()].sort((a, b) => b.from.localeCompare(a.from))
