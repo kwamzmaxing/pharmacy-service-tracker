@@ -1,7 +1,7 @@
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { toast } from "sonner"
 import { onAuthStateChanged, signOut, type User } from "firebase/auth"
-import { Calculator, ChartPie, Ellipsis, FileText, House, LogOut, MessageSquare, NotebookPen, Receipt, Settings as SettingsIcon, ShieldCheck, Store, Monitor, Moon, Sun, UserRound } from "lucide-react"
+import { CalendarDays, Calculator, ChartPie, Ellipsis, FileText, House, LogOut, MessageSquare, NotebookPen, Receipt, Settings as SettingsIcon, ShieldCheck, Store, Monitor, Moon, Sun, UserRound } from "lucide-react"
 import { Toaster } from "@/components/ui/sonner"
 import { Button } from "@/components/ui/button"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuRadioGroup, DropdownMenuRadioItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
@@ -30,9 +30,10 @@ const ClientsTab = named(() => import("@/app/ClientsTab"), "ClientsTab")
 const ExpensesTab = named(() => import("@/app/ExpensesTab"), "ExpensesTab")
 const TaxTab = named(() => import("@/app/TaxTab"), "TaxTab")
 const BudgetTab = named(() => import("@/app/BudgetTab"), "BudgetTab")
+const ShiftsTab = named(() => import("@/app/ShiftsTab"), "ShiftsTab")
 const AdminTab = named(() => import("@/app/AdminTab"), "AdminTab")
 
-const BASE_TABS: [Tab, string][] = [["home", "Home"], ["log", "Log"], ["invoices", "Invoices"], ["expenses", "Expenses"], ["tax", "Tax"], ["budget", "Accounting"], ["clients", "Pharmacies"], ["account", "Settings"]]
+const BASE_TABS: [Tab, string][] = [["home", "Home"], ["shifts", "Shifts"], ["log", "Log"], ["invoices", "Invoices"], ["expenses", "Expenses"], ["tax", "Tax"], ["budget", "Accounting"], ["clients", "Pharmacies"], ["account", "Settings"]]
 /** Pages without their own tab light up the tab they belong to. */
 const SECTION: Partial<Record<Tab, Tab>> = { summary: "invoices", services: "account" }
 const PROBLEM_TEXT: Record<SaveProblem, string> = {
@@ -69,9 +70,9 @@ function SiteFooter({ onFeedback, onHome }: { onFeedback: () => void; onHome: ()
 }
 
 /** Phones: the four most-used sections and "More" in a bar at the bottom, within thumb reach. */
-const MAIN_TABS: [Tab, string, React.ReactNode][] = [["home", "Home", <House />], ["log", "Log", <NotebookPen />], ["invoices", "Invoices", <FileText />], ["expenses", "Expenses", <Receipt />]]
+const MAIN_TABS: [Tab, string, React.ReactNode][] = [["home", "Home", <House />], ["shifts", "Shifts", <CalendarDays />], ["log", "Log", <NotebookPen />], ["invoices", "Invoices", <FileText />]]
 function BottomNav({ tab, go, due, admin }: { tab: Tab; go: (t: Tab) => void; due: number; admin: boolean }) {
-  const more: [Tab, string, React.ReactNode][] = [["tax", "Tax", <Calculator />], ["budget", "Accounting", <ChartPie />], ["clients", "Pharmacies", <Store />], ["account", "Settings", <SettingsIcon />], ...(admin ? [["admin", "Admin", <ShieldCheck />] as [Tab, string, React.ReactNode]] : [])]
+  const more: [Tab, string, React.ReactNode][] = [["expenses", "Expenses", <Receipt />], ["tax", "Tax", <Calculator />], ["budget", "Accounting", <ChartPie />], ["clients", "Pharmacies", <Store />], ["account", "Settings", <SettingsIcon />], ...(admin ? [["admin", "Admin", <ShieldCheck />] as [Tab, string, React.ReactNode]] : [])]
   const inMore = more.some(([k]) => k === tab)
   const item = "relative flex min-w-0 flex-1 flex-col items-center gap-1 rounded-xl py-2 text-[11px] font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring [&_svg]:size-[22px]"
   return (
@@ -229,7 +230,7 @@ export default function App() {
   useEffect(() => {
     if (phase !== "ready") return
     const t = setTimeout(() => {
-      for (const load of [() => import("@/app/SummaryTab"), () => import("@/app/AccountTab"), () => import("@/app/ClientsTab"), () => import("@/app/ExpensesTab"), () => import("@/app/TaxTab"), () => import("@/app/BudgetTab"), () => import("@/app/ServicesTab"), () => import("@/lib/pdf")]) load().catch(() => {})
+      for (const load of [() => import("@/app/SummaryTab"), () => import("@/app/AccountTab"), () => import("@/app/ClientsTab"), () => import("@/app/ExpensesTab"), () => import("@/app/TaxTab"), () => import("@/app/BudgetTab"), () => import("@/app/ShiftsTab"), () => import("@/app/ServicesTab"), () => import("@/lib/pdf")]) load().catch(() => {})
     }, 2500)
     return () => clearTimeout(t)
   }, [phase])
@@ -359,6 +360,7 @@ export default function App() {
           <Suspense fallback={<p className="py-10 text-center text-[13px] text-muted-foreground">Loading…</p>}>
           {welcome ? <Welcome onDone={() => { setWelcome(false); go("home") }} /> : <>
           {tab === "home" && <HomeTab />}
+          {tab === "shifts" && <ShiftsTab />}
           {tab === "log" && <LogTab />}
           {tab === "summary" && <SummaryTab />}
           {tab === "invoices" && <InvoicesTab />}

@@ -1,9 +1,10 @@
 // Home: where things stand, what needs doing, and a way into every part of the tracker.
 import type { ReactNode } from "react"
-import { ArrowRight, Calculator, Car, ChartPie, Clock, FileText, Pill as PillIcon, Plus, Receipt, Settings, Store } from "lucide-react"
+import { ArrowRight, CalendarDays, Calculator, Car, ChartPie, Clock, FileText, Pill as PillIcon, Plus, Receipt, Settings, Store } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { entryAmt, fmtDate, followUpsDue, invStatus, money, monthly, plural, qtyText, taxSummary, unitOf } from "@/lib/model"
 import { useApp, type Tab } from "./ctx"
+import { placeName, shiftPay, toLog, upcoming } from "@/lib/shifts"
 import { Ledger, Panel } from "./bits"
 
 function greeting() {
@@ -44,6 +45,8 @@ export function HomeTab() {
   const todo: { tone: "danger" | "warn" | "info"; text: string; cta: string; act: () => void }[] = []
   if (due.length) todo.push({ tone: "danger", text: `${plural(due.length, "invoice")} ready for a payment reminder.`, cta: "Send follow-ups", act: showFollowUps })
   else if (overdue.length) todo.push({ tone: "danger", text: `${plural(overdue.length, "invoice")} overdue (${money(overdue.reduce((a, i) => a + i.total, 0))}).`, cta: "See invoices", act: () => go("invoices") })
+  const shiftsDone = toLog(data)
+  if (shiftsDone.length) todo.push({ tone: "warn", text: `${plural(shiftsDone.length, "finished shift")} not in your log yet.`, cta: "Review shifts", act: () => go("shifts") })
   if (unbilledTotal > 0) todo.push({ tone: "warn", text: `${money(unbilledTotal)} of logged work isn’t on an invoice yet.`, cta: "Create invoice", act: () => go("summary") })
   const missing = [!p.fullName && "your name", !(p.sortCode && p.accountNumber) && "bank details"].filter(Boolean)
   if (missing.length) todo.push({ tone: "info", text: `Your invoices are missing ${missing.join(" and ")}.`, cta: "Add details", act: () => go("account") })
@@ -51,7 +54,9 @@ export function HomeTab() {
 
   const recent = [...data.entries].sort((a, b) => b.date.localeCompare(a.date)).slice(0, 5)
 
+  const nextShift = upcoming(data)[0]
   const sections: { tab: Tab; icon: ReactNode; title: string; text: string; stat: string }[] = [
+    { tab: "shifts", icon: <CalendarDays />, title: "Shifts", text: "Booked work on a calendar, with what it pays. Syncs to Google Calendar.", stat: nextShift ? `Next: ${fmtDate(nextShift.date)}, ${nextShift.start} · ${placeName(data, nextShift)} · ${money(shiftPay(nextShift))}` : "Nothing booked" },
     { tab: "log", icon: <PillIcon />, title: "Log", text: "Services, hours and journeys as you do them.", stat: `${plural(data.entries.filter((e) => e.date.startsWith(thisMonth.ym)).length, "entry", "entries")} this month` },
     { tab: "invoices", icon: <FileText />, title: "Invoices", text: "Create, send, chase and mark as paid.", stat: open.length ? `${plural(open.length, "unpaid invoice")}` : "Nothing outstanding" },
     { tab: "expenses", icon: <Receipt />, title: "Expenses", text: "Costs and receipt photos, ready for your tax return.", stat: `${money(tax.expenses)} in ${tax.year.label}` },
