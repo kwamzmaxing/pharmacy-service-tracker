@@ -65,9 +65,9 @@ export function InvoicesTab() {
   }
 
   return (
-    <div className="grid gap-4">
+    <div className="grid gap-5 sm:gap-6">
       <div className="flex items-center justify-between gap-3">
-        <h2 className="font-display text-[20px] font-bold tracking-[-0.02em]">Invoices</h2>
+        <h2 className="font-display text-[20px] font-medium">Invoices</h2>
         <Button onClick={() => go("summary")}><Plus /> Create invoice</Button>
       </div>
       <Ledger

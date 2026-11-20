@@ -92,9 +92,9 @@ export function LogTab() {
 
   const pharmacyPicker = data.clients.length > 0 && (
     <div className="grid gap-1.5 sm:max-w-sm">
-      <Label htmlFor="f-client" className="text-xs font-semibold text-muted-foreground">Pharmacy</Label>
+      <Label htmlFor="f-client" className="text-[12.5px] font-normal text-muted-foreground">Pharmacy</Label>
       <Select value={form.clientId || "none"} onValueChange={(v) => setForm({ ...form, clientId: v === "none" ? "" : v })}>
-        <SelectTrigger id="f-client" className="h-10 bg-field text-[14.5px] shadow-none"><SelectValue /></SelectTrigger>
+        <SelectTrigger id="f-client" className="h-11 bg-field text-[15px]"><SelectValue /></SelectTrigger>
         <SelectContent>
           {data.clients.map((c) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
           <SelectItem value="none">Not for a particular pharmacy</SelectItem>
@@ -104,12 +104,12 @@ export function LogTab() {
   )
 
   return (
-    <div className="grid gap-4">
+    <div className="grid gap-5 sm:gap-6">
       <Panel title={editing ? "Edit entry" : "Add to your log"} aside={!editing && (
-        <div role="tablist" aria-label="What to add" className="flex rounded-lg bg-secondary p-0.5">
+        <div role="tablist" aria-label="What to add" className="flex rounded-full bg-secondary p-1">
           {([["service", "Service"], ["hours", "Hours"], ["journey", "Journey"]] as const).map(([k, l]) => (
             <button key={k} role="tab" type="button" aria-selected={mode === k} onClick={() => setMode(k)}
-              className={cn("rounded-md px-3 py-1.5 text-[13px] font-semibold text-muted-foreground transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring", mode === k && "bg-card text-foreground shadow-sm")}>
+              className={cn("rounded-full px-4 py-1.5 text-[13.5px] font-medium text-muted-foreground transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring", mode === k && "bg-background text-foreground")}>
               {l}
             </button>
           ))}
@@ -121,7 +121,7 @@ export function LogTab() {
           <div className="grid gap-3 sm:grid-cols-[1fr_1fr_auto] sm:items-end">
             <Field id="h-date" label="Date" type="date" value={hDate} onChange={(e) => setHDate(e.target.value || today())} />
             <Field id="h-hours" label="Hours that day" type="number" min={0} step="0.25" inputMode="decimal" placeholder="e.g. 7.5" value={hours} onChange={(e) => setHours(e.target.value)} />
-            <Button type="submit" className="h-10 px-5">{existingHours ? "Update hours" : "Save hours"}</Button>
+            <Button type="submit" className="h-11 px-6">{existingHours ? "Update hours" : "Save hours"}</Button>
           </div>
           <p className="text-[12.5px] text-muted-foreground">At £{hs?.fee ?? 25}/hr{form.clientId ? ` for ${data.clients.find((c) => c.id === form.clientId)?.name ?? "the selected pharmacy"}` : ""}. Saving again for the same day replaces that day’s hours. Change the rate under Settings → Services.</p>
         </form>
@@ -136,9 +136,9 @@ export function LogTab() {
           {pharmacyPicker}
           <div className="grid gap-3 sm:grid-cols-[1.4fr_1fr_0.7fr]">
             <div className="grid gap-1.5">
-              <Label htmlFor="f-svc" className="text-xs font-semibold text-muted-foreground">Service</Label>
+              <Label htmlFor="f-svc" className="text-[12.5px] font-normal text-muted-foreground">Service</Label>
               <Select value={form.serviceId} onValueChange={pickService}>
-                <SelectTrigger id="f-svc" className="h-10 bg-field text-[14.5px] shadow-none"><SelectValue placeholder="Choose a service" /></SelectTrigger>
+                <SelectTrigger id="f-svc" className="h-11 bg-field text-[15px]"><SelectValue placeholder="Choose a service" /></SelectTrigger>
                 <SelectContent>
                   {data.services.map((s) => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}
                 </SelectContent>
@@ -152,8 +152,8 @@ export function LogTab() {
             <Field id="f-desc" label="Description" hint="(optional)" placeholder="e.g. UTI consultation, patient initials…" value={form.desc} onChange={(e) => setForm({ ...form, desc: e.target.value })} />
           </div>
           <div className="flex flex-wrap items-center gap-2 pt-1">
-            <Button type="submit" className="h-10 px-5">{editing ? "Save changes" : "Add entry"}</Button>
-            {editing && <Button type="button" variant="outline" className="h-10" onClick={() => { setEditingId(null); setForm(blank()) }}>Cancel</Button>}
+            <Button type="submit" className="h-11 px-6">{editing ? "Save changes" : "Add entry"}</Button>
+            {editing && <Button type="button" variant="outline" className="h-11" onClick={() => { setEditingId(null); setForm(blank()) }}>Cancel</Button>}
             {!editing && form.qty && form.fee && (
               <span className="num ml-auto text-sm text-muted-foreground">= {money(parseQty(form.qty) * (parseFloat(form.fee) || 0))}</span>
             )}

@@ -17,7 +17,7 @@ export function InvoiceDoc({ inv, logo }: { inv: Invoice; logo?: string }) {
       <div className="mb-5 flex flex-col justify-between gap-5 border-b-2 border-foreground pb-4 sm:flex-row sm:items-start">
         <div>
           {logo && <img src={logo} alt="" className="mb-2 max-h-14 max-w-[180px] object-contain" />}
-          <h3 className="font-display text-[26px] font-bold leading-tight tracking-[-0.01em]">Invoice</h3>
+          <h3 className="font-display text-[26px] font-medium leading-tight">Invoice</h3>
           <div className="mt-0.5 font-semibold text-muted-foreground">{inv.number}</div>
           {paid && (
             <div className="mt-2 inline-block rounded-md border-2 border-brand-ink px-2.5 py-0.5 text-xs font-bold uppercase tracking-[0.08em] text-brand-ink">
@@ -69,7 +69,7 @@ export function InvoiceDoc({ inv, logo }: { inv: Invoice; logo?: string }) {
         <span className="num">{money(inv.total)}</span>
       </div>
       {(pay.sortCode || pay.accountNumber) && (
-        <div className="mt-6 grid gap-0.5 rounded-[10px] border p-3.5 text-[13px]">
+        <div className="mt-6 grid gap-0.5 rounded-xl border p-3.5 text-[13px]">
           <span className="k">Payment details</span>
           {pay.accountName && <div>Account name: <b>{pay.accountName}</b></div>}
           {pay.bankName && <div>Bank: {pay.bankName}</div>}

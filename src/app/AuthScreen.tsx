@@ -96,40 +96,36 @@ export function AuthScreen({ notice }: { notice?: string }) {
 
   const label: Record<Mode, [string, string]> = { in: ["Log in", "Logging in…"], up: ["Create account", "Creating account…"], forgot: ["Email me a reset link", "Sending…"] }
   return (
-    <div className="min-h-screen bg-header">
-      <div className="wrap grid min-h-screen content-center gap-7 py-10 sm:grid-cols-[1fr_400px] sm:items-center sm:gap-12">
-        <div className="text-header-fg">
+    <div className="min-h-screen bg-background">
+      <div className="wrap grid min-h-screen max-w-[1080px] content-center gap-10 py-12 md:grid-cols-[1fr_420px] md:items-center md:gap-16">
+        <div>
           <div className="flex items-center gap-3">
-            <div className="flex size-11 items-center justify-center rounded-xl border border-white/20 bg-white/10 font-display text-[25px] font-bold">℞</div>
-            <div>
-              <h1 className="font-display text-[22px] font-bold leading-tight text-white">Service Tracker</h1>
-              <p className="text-[13px] text-header-muted">Log it. Total it. Invoice it.</p>
-            </div>
+            <div aria-hidden className="flex size-10 items-center justify-center rounded-lg bg-secondary font-display text-[22px] font-medium">℞</div>
+            <span className="font-display text-[17px] font-medium">Service Tracker</span>
           </div>
-          <ul className="mt-6 hidden max-w-sm gap-2 text-[13.5px] text-header-muted sm:grid">
-            <li>Log services and hours as you go.</li>
-            <li>Turn a month into an invoice with your own details.</li>
-            <li>Email invoices from your Gmail, put due dates in your calendar, and follow up on late payments.</li>
-          </ul>
+          <h1 className="mt-10 max-w-[14ch] font-display text-[clamp(32px,6vw,52px)] font-medium leading-[1.1]">Locum work, invoiced and paid.</h1>
+          <p className="mt-5 max-w-md text-[16px] leading-relaxed text-muted-foreground">
+            Log shifts, services and mileage as you go. Turn them into invoices in one tap, follow up when payments are late, and see what you owe in tax.
+          </p>
         </div>
 
-        <div className="rounded-[18px] border bg-card p-6 text-card-foreground shadow-[0_18px_50px_-20px_rgba(0,0,0,.45)]">
+        <div className="rounded-2xl bg-card p-6 text-card-foreground sm:p-8">
           {mode !== "forgot" ? (
-            <div role="tablist" aria-label="Log in or create an account" className="mb-5 flex rounded-[10px] bg-secondary p-1">
+            <div role="tablist" aria-label="Log in or create an account" className="mb-6 flex rounded-full bg-secondary p-1">
               {(["in", "up"] as const).map((m) => (
                 <button key={m} role="tab" type="button" aria-selected={mode === m} onClick={() => { setMode(m); setInfo("") }}
-                  className={cn("flex-1 rounded-lg py-2 text-[13.5px] font-semibold text-muted-foreground transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring", mode === m && "bg-card text-brand-ink shadow-sm")}>
+                  className={cn("flex-1 rounded-full py-2 text-[14px] font-medium text-muted-foreground transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring", mode === m && "bg-card text-foreground")}>
                   {m === "in" ? "Log in" : "Create account"}
                 </button>
               ))}
             </div>
           ) : (
             <div className="mb-4">
-              <h2 className="font-display text-[18px] font-bold">Forgot your password?</h2>
+              <h2 className="font-display text-[22px] font-medium">Forgot your password?</h2>
               <p className="mt-1 text-[13px] text-muted-foreground">Enter your account email and we’ll send you a link to choose a new one. Your entries and invoices are kept.</p>
             </div>
           )}
-          {info && <p className="mb-4 rounded-[9px] bg-ok-tint px-3 py-2.5 text-[13px] text-brand-ink">{info}</p>}
+          {info && <p className="mb-4 rounded-xl bg-ok-tint px-3 py-2.5 text-[13px] text-brand-ink">{info}</p>}
 
           {mode !== "forgot" && (
             <>

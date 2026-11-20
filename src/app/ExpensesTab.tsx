@@ -64,7 +64,7 @@ export function ExpensesTab() {
   }
 
   return (
-    <div className="grid gap-4">
+    <div className="grid gap-5 sm:gap-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-2">
           <Label htmlFor="x-year" className="text-[13px] text-muted-foreground">Tax year</Label>
@@ -196,9 +196,9 @@ function ExpenseForm({ onDone }: { onDone: () => void }) {
           <Field id="x-date" label="Date" type="date" value={date} onChange={(e) => setDate(e.target.value || today())} />
           <MoneyField id="x-amount" label="Amount" placeholder="0.00" value={amount} onChange={(e) => setAmount(e.target.value)} />
           <div className="grid gap-1.5">
-            <Label htmlFor="x-cat" className="text-xs font-semibold text-muted-foreground">Category</Label>
+            <Label htmlFor="x-cat" className="text-[12.5px] font-normal text-muted-foreground">Category</Label>
             <Select value={category} onValueChange={(v) => setCategory(v as ExpenseCategory)}>
-              <SelectTrigger id="x-cat" className="h-10 bg-field text-[14.5px] shadow-none"><SelectValue /></SelectTrigger>
+              <SelectTrigger id="x-cat" className="h-11 bg-field text-[15px]"><SelectValue /></SelectTrigger>
               <SelectContent>{EXPENSE_CATEGORIES.map(([c, name, hint]) => <SelectItem key={c} value={c}><span>{name}</span><span className="ml-2 text-[12px] text-muted-foreground">{hint}</span></SelectItem>)}</SelectContent>
             </Select>
           </div>
@@ -207,9 +207,9 @@ function ExpenseForm({ onDone }: { onDone: () => void }) {
           <Field id="x-desc" label="What it was" hint="(optional)" placeholder="e.g. Parking at Riverside, GPhC renewal" value={desc} onChange={(e) => setDesc(e.target.value)} />
           {data.clients.length > 0 && (
             <div className="grid gap-1.5">
-              <Label htmlFor="x-client" className="text-xs font-semibold text-muted-foreground">Shift at {worked ? "" : <span className="font-normal">(optional)</span>}</Label>
+              <Label htmlFor="x-client" className="text-[12.5px] font-normal text-muted-foreground">Shift at {worked ? "" : <span className="font-normal">(optional)</span>}</Label>
               <Select value={clientId || "none"} onValueChange={(v) => setClientId(v === "none" ? "" : v)}>
-                <SelectTrigger id="x-client" className="h-10 bg-field text-[14.5px] shadow-none"><SelectValue /></SelectTrigger>
+                <SelectTrigger id="x-client" className="h-11 bg-field text-[15px]"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   {data.clients.map((c) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
                   <SelectItem value="none">Not linked to a shift</SelectItem>
@@ -230,8 +230,8 @@ function ExpenseForm({ onDone }: { onDone: () => void }) {
           )}
         </div>
         <div className="flex gap-2 pt-1">
-          <Button type="submit" className="h-10 px-5" disabled={busy}>{busy ? "Saving…" : "Save expense"}</Button>
-          <Button type="button" variant="ghost" className="h-10" onClick={onDone}>Cancel</Button>
+          <Button type="submit" className="h-11 px-6" disabled={busy}>{busy ? "Saving…" : "Save expense"}</Button>
+          <Button type="button" variant="ghost" className="h-11" onClick={onDone}>Cancel</Button>
         </div>
       </form>
     </Panel>

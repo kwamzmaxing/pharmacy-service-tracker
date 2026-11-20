@@ -34,14 +34,14 @@ export function ConfirmDialog({ req: live, onDone }: { req: AskOptions | null; o
   const ready = !req?.typeToConfirm || typed.trim() === req.typeToConfirm
   return (
     <Dialog open={!!live} onOpenChange={(o) => !o && onDone(false)}>
-      <DialogContent className="max-w-md rounded-[14px]">
+      <DialogContent className="max-w-md rounded-2xl">
         <DialogHeader>
           <DialogTitle className="font-display">{req?.title}</DialogTitle>
           <DialogDescription className="whitespace-pre-line text-[13.5px] text-foreground">{req?.message}</DialogDescription>
         </DialogHeader>
         {req?.typeToConfirm && (
           <div className="grid gap-1.5">
-            <Label htmlFor="confirm-type" className="text-xs font-semibold text-muted-foreground">Type {req.typeToConfirm} to confirm</Label>
+            <Label htmlFor="confirm-type" className="text-[12.5px] font-normal text-muted-foreground">Type {req.typeToConfirm} to confirm</Label>
             <Input id="confirm-type" autoComplete="off" value={typed} onChange={(e) => setTyped(e.target.value)} onKeyDown={(e) => e.key === "Enter" && ready && onDone(true)} />
           </div>
         )}
@@ -99,7 +99,7 @@ export function InvoiceDialog({ id, justCreated, onClose }: { id: string | null;
   const emailed = !!inv?.sentAt || inv?.sentVia === "admin"
   return (
     <Dialog open={!!inv} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="max-h-[90vh] max-w-[720px] overflow-y-auto rounded-[14px] p-5">
+      <DialogContent className="max-h-[90vh] max-w-[720px] overflow-y-auto rounded-2xl p-5">
         {inv && (
           <>
             <DialogHeader>
@@ -112,12 +112,12 @@ export function InvoiceDialog({ id, justCreated, onClose }: { id: string | null;
               </DialogDescription>
             </DialogHeader>
             {justCreated && !emailed && (
-              <div className="flex flex-wrap items-center justify-between gap-3 rounded-[10px] bg-ok-tint px-3.5 py-3 text-[13px] text-brand-ink">
+              <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl bg-ok-tint px-3.5 py-3 text-[13px] text-brand-ink">
                 <span><b>Invoice saved.</b> Send it to {inv.to.name || "the pharmacy"} now?</span>
                 <Button size="sm" onClick={() => email(inv.id, "invoice")}><Send /> Email invoice</Button>
               </div>
             )}
-            <div className="min-w-0 rounded-xl border p-5">
+            <div data-theme="light" className="min-w-0 rounded-xl bg-white p-5 sm:p-7">
               <InvoiceDoc inv={inv} logo={data.profile.logo} />
             </div>
             <div className="flex flex-wrap items-center gap-2 text-[12.5px] text-muted-foreground">
@@ -254,7 +254,7 @@ export function EmailDialog({ req, onClose, onBack }: { req: { id: string; kind:
 
   return (
     <Dialog open={!!inv} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="max-h-[92vh] max-w-xl overflow-y-auto rounded-[14px]">
+      <DialogContent className="max-h-[92vh] max-w-xl overflow-y-auto rounded-2xl">
         {inv && (
           <>
             <DialogHeader>
@@ -267,15 +267,15 @@ export function EmailDialog({ req, onClose, onBack }: { req: { id: string; kind:
             </DialogHeader>
             <div className="grid gap-3">
               <div className="grid gap-1.5">
-                <Label htmlFor="em-to" className="text-xs font-semibold text-muted-foreground">To</Label>
+                <Label htmlFor="em-to" className="text-[12.5px] font-normal text-muted-foreground">To</Label>
                 <Input id="em-to" type="email" value={to} placeholder="accounts@pharmacy.co.uk" onChange={(e) => setTo(e.target.value)} className="bg-field" />
               </div>
               <div className="grid gap-1.5">
-                <Label htmlFor="em-sub" className="text-xs font-semibold text-muted-foreground">Subject</Label>
+                <Label htmlFor="em-sub" className="text-[12.5px] font-normal text-muted-foreground">Subject</Label>
                 <Input id="em-sub" value={subject} onChange={(e) => setSubject(e.target.value)} className="bg-field" />
               </div>
               <div className="grid gap-1.5">
-                <Label htmlFor="em-body" className="text-xs font-semibold text-muted-foreground">Message</Label>
+                <Label htmlFor="em-body" className="text-[12.5px] font-normal text-muted-foreground">Message</Label>
                 <Textarea id="em-body" rows={11} value={body} onChange={(e) => setBody(e.target.value)} className="bg-field text-[13.5px]" />
               </div>
               {(mine || relay) && (
@@ -286,14 +286,14 @@ export function EmailDialog({ req, onClose, onBack }: { req: { id: string; kind:
               )}
             </div>
             {!mine && google.gmail !== "unavailable" && (
-              <p className="flex flex-wrap items-center gap-2 rounded-[9px] bg-secondary px-3 py-2.5 text-[12.5px] text-muted-foreground">
+              <p className="flex flex-wrap items-center gap-2 rounded-xl bg-secondary px-3 py-2.5 text-[12.5px] text-muted-foreground">
                 Connect your Gmail to send straight from here.
                 <button type="button" className="font-semibold text-brand-ink underline-offset-2 hover:underline" onClick={() => connect("gmail")}>Connect Gmail</button>
                 <span aria-hidden>·</span>
                 <button type="button" className="font-semibold text-brand-ink underline-offset-2 hover:underline" onClick={() => { onClose(); go("account") }}>Email settings</button>
               </p>
             )}
-            {note && <p role="alert" className="rounded-[9px] bg-warn-tint px-3 py-2.5 text-[12.5px] text-warn">{note}</p>}
+            {note && <p role="alert" className="rounded-xl bg-warn-tint px-3 py-2.5 text-[12.5px] text-warn">{note}</p>}
             <DialogFooter className="flex-wrap gap-2">
               <Button variant="ghost" onClick={onBack || onClose}>{onBack ? "Back" : "Cancel"}</Button>
               <Button variant="outline" onClick={openEmailApp}><Mail /> Email app</Button>
@@ -332,14 +332,14 @@ export function FeedbackDialog({ open, onClose }: { open: boolean; onClose: () =
   }
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="max-h-[90vh] max-w-md overflow-y-auto rounded-[14px]">
+      <DialogContent className="max-h-[90vh] max-w-md overflow-y-auto rounded-2xl">
         <DialogHeader>
           <DialogTitle className="font-display">Send feedback</DialogTitle>
           <DialogDescription>Goes to {settings?.adminName || "the person who runs this tracker"}, with your name and email so they can reply.</DialogDescription>
         </DialogHeader>
         <div className="grid gap-3">
           <div className="grid gap-1.5">
-            <span className="text-xs font-semibold text-muted-foreground">About</span>
+            <span className="text-[12.5px] font-normal text-muted-foreground">About</span>
             <div className="flex flex-wrap gap-1.5" role="group" aria-label="Feedback topic">
               {TOPICS.map((t) => (
                 <button key={t} type="button" aria-pressed={topic === t} onClick={() => setTopic(t)}
@@ -348,7 +348,7 @@ export function FeedbackDialog({ open, onClose }: { open: boolean; onClose: () =
             </div>
           </div>
           <div className="grid gap-1.5">
-            <span className="text-xs font-semibold text-muted-foreground">How’s the tracker working for you? <span className="font-normal">(optional)</span></span>
+            <span className="text-[12.5px] font-normal text-muted-foreground">How’s the tracker working for you? <span className="font-normal">(optional)</span></span>
             <div className="flex gap-1" role="group" aria-label="Rating out of 5">
               {[1, 2, 3, 4, 5].map((n) => (
                 <button key={n} type="button" aria-label={`${n} out of 5`} aria-pressed={rating === n} onClick={() => setRating(rating === n ? 0 : n)} className="rounded p-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
@@ -358,7 +358,7 @@ export function FeedbackDialog({ open, onClose }: { open: boolean; onClose: () =
             </div>
           </div>
           <div className="grid gap-1.5">
-            <Label htmlFor="fb-msg" className="text-xs font-semibold text-muted-foreground">Message</Label>
+            <Label htmlFor="fb-msg" className="text-[12.5px] font-normal text-muted-foreground">Message</Label>
             <Textarea id="fb-msg" rows={5} value={message} onChange={(e) => setMessage(e.target.value)} placeholder="What’s working, what isn’t, what you’d like added…" className="bg-field" />
           </div>
         </div>
@@ -381,7 +381,7 @@ export function FollowUpDialog({ open, onClose, onFollowUp, onView }: { open: bo
   }, [open, list.length, onClose])
   return (
     <Dialog open={open && list.length > 0} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="max-h-[90vh] max-w-xl overflow-y-auto rounded-[14px]">
+      <DialogContent className="max-h-[90vh] max-w-xl overflow-y-auto rounded-2xl">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2.5 font-display">
             <span className="flex size-7 items-center justify-center rounded-full bg-destructive text-destructive-foreground"><AlertTriangle className="size-4" /></span>

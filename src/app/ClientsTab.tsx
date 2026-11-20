@@ -53,7 +53,7 @@ export function ClientsTab() {
     .sort((a, b) => b.s.owed - a.s.owed || (b.s.lastInvoice || "").localeCompare(a.s.lastInvoice || "") || a.c.name.localeCompare(b.c.name))
 
   return (
-    <div className="grid gap-4">
+    <div className="grid gap-5 sm:gap-6">
       <Panel
         title="Pharmacies"
         aside={!adding && <Button size="sm" variant="outline" onClick={() => setAdding(true)}><Plus /> Add pharmacy</Button>}
@@ -78,7 +78,7 @@ export function ClientsTab() {
             {rows.map(({ c, s }) => (
               <li key={c.id}>
                 <button type="button" onClick={() => openClient(c.id)} className="flex w-full items-center gap-3 rounded-md px-2 py-3 text-left hover:bg-secondary/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
-                  <span className="flex size-9 flex-none items-center justify-center rounded-md bg-accent font-display text-[14px] font-bold text-accent-foreground" aria-hidden>{c.name.trim()[0]?.toUpperCase() || "?"}</span>
+                  <span className="flex size-9 flex-none items-center justify-center rounded-md bg-accent font-display text-[14px] font-medium text-accent-foreground" aria-hidden>{c.name.trim()[0]?.toUpperCase() || "?"}</span>
                   <span className="min-w-0 flex-1">
                     <span className="block truncate text-[14.5px] font-semibold">{c.name}</span>
                     <span className="block truncate text-[12.5px] text-muted-foreground">
@@ -132,12 +132,12 @@ function ClientProfile({ c, onBack }: { c: Client; onBack: () => void }) {
   }
 
   return (
-    <div className="grid gap-4">
+    <div className="grid gap-5 sm:gap-6">
       <div className="flex items-center gap-2">
         <Button variant="ghost" size="sm" className="-ml-2 text-muted-foreground" onClick={onBack}><ArrowLeft /> Pharmacies</Button>
       </div>
       <div>
-        <h2 className="font-display text-[24px] font-bold leading-tight tracking-[-0.02em]">{c.name}</h2>
+        <h2 className="font-display text-[24px] font-medium leading-tight">{c.name}</h2>
         <p className="mt-0.5 text-[13px] text-muted-foreground">
           {s.invoices ? `${plural(s.invoices, "invoice")} since ${fmtDate(invs[invs.length - 1]?.issued)}` : "No invoices yet"}{c.email && ` · ${c.email}`}
         </p>

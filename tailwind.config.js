@@ -8,8 +8,8 @@ module.exports = {
   theme: {
     extend: {
       fontFamily: {
-        sans: ['Figtree', 'ui-sans-serif', 'system-ui', '-apple-system', 'Segoe UI', 'sans-serif'],
-        display: ['"Bricolage Grotesque"', 'Figtree', 'ui-sans-serif', 'system-ui', 'sans-serif'],
+        sans: ['Inter', 'ui-sans-serif', 'system-ui', '-apple-system', 'Segoe UI', 'sans-serif'],
+        display: ['Archivo', 'Inter', 'ui-sans-serif', 'system-ui', 'sans-serif'],
       },
       colors: {
         "brand-ink": "hsl(var(--brand-ink))",
@@ -17,7 +17,7 @@ module.exports = {
         header: { DEFAULT: "hsl(var(--header))", fg: "hsl(var(--header-fg))", muted: "hsl(var(--header-muted))" },
         warn: { DEFAULT: "hsl(var(--warn))", tint: "hsl(var(--warn-tint))" },
         danger: { ink: "hsl(var(--danger-ink))", tint: "hsl(var(--danger-tint))" },
-        ok: { tint: "hsl(var(--ok-tint))" },
+        ok: { tint: "hsl(var(--ok-tint))", ink: "hsl(var(--ok-ink))" },
         border: "hsl(var(--border))",
         input: "hsl(var(--input))",
         ring: "hsl(var(--ring))",

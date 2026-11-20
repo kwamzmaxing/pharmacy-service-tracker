@@ -2,6 +2,7 @@ import { createContext, useContext } from "react"
 import type { Data } from "@/lib/model"
 import type { OutboxItem, PublicSettings } from "@/lib/cloud"
 import type { ConnStatus, GoogleArea } from "@/lib/google"
+import type { ThemePref } from "@/lib/theme"
 
 export type Tab = "log" | "summary" | "invoices" | "expenses" | "tax" | "clients" | "services" | "account" | "admin"
 export type EmailKind = "invoice" | "followup"
@@ -42,6 +43,8 @@ export type AppApi = {
   isAdmin: boolean
   settings: PublicSettings | null
   setSettings: (s: PublicSettings | null) => void
+  theme: ThemePref
+  setTheme: (t: ThemePref) => void
   /** Emails this person queued to go out from the admin's Gmail. */
   outbox: OutboxItem[]
   refreshOutbox: () => Promise<void>

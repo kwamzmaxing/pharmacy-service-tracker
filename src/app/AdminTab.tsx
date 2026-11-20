@@ -114,12 +114,12 @@ export function AdminTab() {
   const s = settings
 
   return (
-    <div className="grid gap-4">
+    <div className="grid gap-5 sm:gap-6">
       <div className="grid grid-cols-3 gap-2.5">
         {([["Account holders", people.length], ["Waiting to send", waiting.length], ["Feedback", feedback.length]] as const).map(([k, v]) => (
-          <div key={k} className={cn("min-w-0 rounded-[14px] border bg-card px-3.5 py-3", k === "Waiting to send" && v > 0 && "border-destructive/40 bg-danger-tint")}>
+          <div key={k} className={cn("min-w-0 rounded-2xl border bg-card px-3.5 py-3", k === "Waiting to send" && v > 0 && "border-destructive/40 bg-danger-tint")}>
             <div className="truncate text-[11.5px] font-semibold text-muted-foreground">{k}</div>
-            <div className="num font-display text-[21px] font-bold">{v}</div>
+            <div className="num font-display text-[21px] font-medium">{v}</div>
           </div>
         ))}
       </div>
@@ -133,7 +133,7 @@ export function AdminTab() {
 
       <Panel title="Waiting to send" aside={<Button size="sm" variant="ghost" className="h-7" onClick={reload} disabled={loading}><RefreshCw /> Refresh</Button>}>
         {google.gmail !== "ready" && (
-          <p className="mb-3 flex flex-wrap items-center gap-2 rounded-[9px] bg-warn-tint px-3 py-2.5 text-[12.5px] text-warn">
+          <p className="mb-3 flex flex-wrap items-center gap-2 rounded-xl bg-warn-tint px-3 py-2.5 text-[12.5px] text-warn">
             Connect your Gmail to send these.
             <button type="button" className="font-semibold underline-offset-2 hover:underline" onClick={() => connect("gmail")}>Connect Gmail</button>
           </p>

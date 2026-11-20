@@ -50,7 +50,7 @@ export function TaxTab() {
   )
 
   return (
-    <div className="grid gap-4">
+    <div className="grid gap-5 sm:gap-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-2">
           <Label htmlFor="t-year" className="text-[13px] text-muted-foreground">Tax year</Label>
@@ -100,8 +100,8 @@ export function TaxTab() {
           </div>
         </div>
         <div className="mt-4 flex items-baseline justify-between border-t-2 border-foreground pt-3">
-          <span className="font-display text-[16px] font-bold">Estimated tax and NI</span>
-          <span className="num font-display text-[20px] font-bold">{money(t.total)}</span>
+          <span className="font-display text-[16px] font-medium">Estimated tax and NI</span>
+          <span className="num font-display text-[20px] font-medium">{money(t.total)}</span>
         </div>
         {t.total > 1000 && (
           <p className="mt-3 rounded-md bg-secondary px-3 py-2.5 text-[12.5px] text-muted-foreground">
@@ -113,14 +113,14 @@ export function TaxTab() {
       <Panel title="Your tax settings">
         <div className="grid gap-4">
           <div className="grid gap-1.5">
-            <span className="text-xs font-semibold text-muted-foreground">Count income</span>
+            <span className="text-[12.5px] font-normal text-muted-foreground">Count income</span>
             <Chips<"cash" | "earned"> label="Count income" value={p.taxBasis || "cash"} onChange={(v) => set("taxBasis", v)} options={[["cash", "When I’m paid (HMRC default)"], ["earned", "When I do the work"]]} />
           </div>
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="grid gap-1.5">
-              <Label htmlFor="t-vehicle" className="text-xs font-semibold text-muted-foreground">I travel to work by</Label>
+              <Label htmlFor="t-vehicle" className="text-[12.5px] font-normal text-muted-foreground">I travel to work by</Label>
               <Select value={p.vehicle || "car"} onValueChange={(v) => set("vehicle", v as Vehicle)}>
-                <SelectTrigger id="t-vehicle" className="h-10 bg-field text-[14.5px] shadow-none"><SelectValue /></SelectTrigger>
+                <SelectTrigger id="t-vehicle" className="h-11 bg-field text-[15px]"><SelectValue /></SelectTrigger>
                 <SelectContent>{VEHICLES.map(([v, l]) => <SelectItem key={v} value={v}>{l}</SelectItem>)}</SelectContent>
               </Select>
             </div>

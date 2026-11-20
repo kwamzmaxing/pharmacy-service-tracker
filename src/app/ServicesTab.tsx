@@ -33,17 +33,17 @@ export function ServicesTab() {
   }
 
   return (
-    <div className="grid gap-4">
+    <div className="grid gap-5 sm:gap-6">
       <div><Button variant="ghost" size="sm" className="-ml-2 text-muted-foreground" onClick={() => go("account")}><ArrowLeft /> Settings</Button></div>
       <Panel title="Add a service type">
         <form onSubmit={add} className="grid gap-3 sm:grid-cols-[2fr_1fr_1fr_auto] sm:items-end">
           <Field id="s-name" label="Name" placeholder="e.g. Flu vaccination" value={name} onChange={(e) => setName(e.target.value)} />
           <MoneyField id="s-fee" label="Default rate" placeholder="0.00" value={fee} onChange={(e) => setFee(e.target.value)} />
           <div className="grid gap-1.5">
-            <Label htmlFor="s-unit" className="text-xs font-semibold text-muted-foreground">Charged</Label>
+            <Label htmlFor="s-unit" className="text-[12.5px] font-normal text-muted-foreground">Charged</Label>
             <UnitSelect id="s-unit" value={unit} onChange={setUnit} />
           </div>
-          <Button type="submit" className="h-10 px-5">Add service</Button>
+          <Button type="submit" className="h-11 px-6">Add service</Button>
         </form>
       </Panel>
       <Panel title="Your services" aside="changes save when you leave a box">

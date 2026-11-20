@@ -67,14 +67,14 @@ export function SummaryTab() {
   }
 
   return (
-    <div className="grid gap-4">
+    <div className="grid gap-5 sm:gap-6">
       <div><Button variant="ghost" size="sm" className="-ml-2 text-muted-foreground" onClick={() => go("invoices")}><ArrowLeft /> Invoices</Button></div>
       <Panel title="Create an invoice">
         <div className="grid gap-4">
           <div className="grid gap-1.5 sm:max-w-sm">
-            <Label htmlFor="s-client" className="text-xs font-semibold text-muted-foreground">Invoice to</Label>
+            <Label htmlFor="s-client" className="text-[12.5px] font-normal text-muted-foreground">Invoice to</Label>
             <Select value={adding ? NEW : clientId} onValueChange={(v) => { if (v === NEW) setAdding(true); else { setAdding(false); setClientId(v) } }}>
-              <SelectTrigger id="s-client" className="h-10 bg-field text-[14.5px] shadow-none"><SelectValue placeholder="Choose a pharmacy" /></SelectTrigger>
+              <SelectTrigger id="s-client" className="h-11 bg-field text-[15px]"><SelectValue placeholder="Choose a pharmacy" /></SelectTrigger>
               <SelectContent>
                 {data.clients.map((c) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
                 {data.clients.length > 0 && <SelectSeparator />}
@@ -98,7 +98,7 @@ export function SummaryTab() {
             </div>
           )}
           <div className="grid gap-1.5">
-            <span className="text-xs font-semibold text-muted-foreground">Period</span>
+            <span className="text-[12.5px] font-normal text-muted-foreground">Period</span>
             <Chips<RangeMode>
               label="Period"
               value={range.mode}
@@ -119,7 +119,7 @@ export function SummaryTab() {
         <div className="flex flex-wrap items-end justify-between gap-4 border-b pb-4">
           <div>
             <div className="text-[12.5px] font-medium text-muted-foreground">Ready to invoice{client ? ` to ${client.name}` : ""} · {rangeLabel(range)}</div>
-            <div className="num mt-1 font-display text-[34px] font-bold leading-none tracking-[-0.025em]">{money(pendTotal)}</div>
+            <div className="num mt-1 font-display text-[34px] font-medium leading-none">{money(pendTotal)}</div>
           </div>
           <div className="num text-right text-[12.5px] text-muted-foreground">
             {money(total)} logged in this period
@@ -161,7 +161,7 @@ export function SummaryTab() {
               </Callout>
             )}
             <div className="flex flex-wrap gap-2">
-              <Button className="h-10 px-5" disabled={!pend.length || !client} onClick={create}>
+              <Button className="h-11 px-6" disabled={!pend.length || !client} onClick={create}>
                 Create invoice{pend.length ? ` · ${money(pendTotal)}` : ""}
               </Button>
               {!client && <span className="self-center text-[12.5px] text-muted-foreground">Choose who to invoice first.</span>}

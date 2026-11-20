@@ -19,14 +19,15 @@ import { shrinkImage } from "@/lib/images"
 import { saveFile } from "@/lib/store"
 import type { ConnStatus } from "@/lib/google"
 import { useApp } from "./ctx"
-import { AreaField, Field, Panel, Pill } from "./bits"
+import { AreaField, Chips, Field, Panel, Pill } from "./bits"
+import type { ThemePref } from "@/lib/theme"
 
 const STATUS_LABEL = { paid: "Paid", unpaid: "Unpaid", overdue: "Overdue" }
 const connLabel = (s: ConnStatus) => ({ ready: "Connected", not_connected: "Not connected", unavailable: "Not set up" })[s]
 const connTone = (s: ConnStatus) => (s === "ready" ? "done" : s === "unavailable" ? "pending" : "overdue") as "done" | "pending" | "overdue"
 
 export function AccountTab() {
-  const { data, commit, me, ask, replaceAll, logOut, accountDeleted, google, connect, disconnectGoogle, settings, isAdmin, openFeedback, go } = useApp()
+  const { data, commit, me, ask, replaceAll, logOut, accountDeleted, google, connect, disconnectGoogle, settings, isAdmin, openFeedback, go, theme, setTheme } = useApp()
   const p = data.profile
   const restoreRef = useRef<HTMLInputElement>(null)
   const combineRef = useRef<HTMLInputElement>(null)
@@ -43,9 +44,9 @@ export function AccountTab() {
   )
   const choose = <T extends string | number>(k: keyof Profile, label: string, options: [T, string][]) => (
     <div className="grid gap-1.5">
-      <Label htmlFor={"p-" + k} className="text-xs font-semibold text-muted-foreground">{label}</Label>
+      <Label htmlFor={"p-" + k} className="text-[12.5px] font-normal text-muted-foreground">{label}</Label>
       <Select value={String(p[k])} onValueChange={(v) => set(k, typeof options[0][0] === "number" ? Number(v) : v)}>
-        <SelectTrigger id={"p-" + k} className="h-10 bg-field text-[14.5px] shadow-none"><SelectValue /></SelectTrigger>
+        <SelectTrigger id={"p-" + k} className="h-11 bg-field text-[15px]"><SelectValue /></SelectTrigger>
         <SelectContent>{options.map(([v, l]) => <SelectItem key={String(v)} value={String(v)}>{l}</SelectItem>)}</SelectContent>
       </Select>
     </div>
@@ -187,15 +188,19 @@ export function AccountTab() {
   }
 
   return (
-    <div className="grid gap-4">
+    <div className="grid gap-5 sm:gap-6">
       <button type="button" onClick={() => go("services")}
-        className="flex items-center justify-between gap-3 rounded-[10px] border bg-card px-5 py-4 text-left hover:border-primary/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+        className="flex items-center justify-between gap-3 rounded-xl border bg-card px-5 py-4 text-left hover:border-primary/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
         <span>
-          <span className="block font-display text-[16px] font-bold tracking-[-0.015em]">Services & rates</span>
+          <span className="block font-display text-[16px] font-medium">Services & rates</span>
           <span className="text-[13px] text-muted-foreground">{data.services.length} services · {data.services.map((s) => s.name).slice(0, 3).join(", ")}{data.services.length > 3 ? "…" : ""}</span>
         </span>
         <span aria-hidden className="text-muted-foreground">→</span>
       </button>
+
+      <Panel title="Appearance">
+        <Chips<ThemePref> label="Appearance" value={theme} onChange={setTheme} options={[["dark", "Dark"], ["light", "Light"], ["system", "Match my device"]]} />
+      </Panel>
 
       <Panel title="Logged in" aside={me.viaGoogle ? "with Google" : me.emailVerified ? "email verified" : "email not verified yet"}>
         <div className="flex flex-wrap items-center justify-between gap-3">
@@ -228,11 +233,11 @@ export function AccountTab() {
           </div>
           {relay && (
             <div className="grid gap-1.5">
-              <span className="text-xs font-semibold text-muted-foreground">Send invoice and follow-up emails from</span>
+              <span className="text-[12.5px] font-normal text-muted-foreground">Send invoice and follow-up emails from</span>
               <div role="radiogroup" aria-label="Send emails from" className="grid gap-2 sm:grid-cols-2">
                 {([["mine", "My own Gmail", "Sent straight away, from your address."], ["admin", `${settings?.adminName || "The admin"}’s email`, "Queued and sent from their Gmail."]] as const).map(([v, t, d]) => (
                   <button key={v} type="button" role="radio" aria-checked={p.sendVia === v} onClick={() => set("sendVia", v)}
-                    className={`rounded-[10px] border px-3.5 py-2.5 text-left text-[13px] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${p.sendVia === v ? "border-primary bg-accent" : "bg-field"}`}>
+                    className={`rounded-xl border px-3.5 py-2.5 text-left text-[13px] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${p.sendVia === v ? "border-primary bg-accent" : "bg-field"}`}>
                     <span className="block font-semibold">{t}</span>
                     <span className="text-[12px] text-muted-foreground">{d}</span>
                   </button>

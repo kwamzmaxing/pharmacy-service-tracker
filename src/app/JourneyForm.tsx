@@ -112,7 +112,7 @@ export function JourneyForm() {
     <div className="grid gap-4">
       {saved.length > 0 && (
         <div className="grid gap-1.5">
-          <span className="text-xs font-semibold text-muted-foreground">Saved journeys</span>
+          <span className="text-[12.5px] font-normal text-muted-foreground">Saved journeys</span>
           <div className="flex flex-wrap gap-1.5">
             {saved.slice(0, 6).map((j) => (
               <button key={j.id} type="button" onClick={() => useSaved(j)}
@@ -147,7 +147,7 @@ export function JourneyForm() {
           )}
         </div>
         {err && <p role="alert" className="text-[13px] text-danger-ink">{err}</p>}
-        {!result && <div><Button type="submit" disabled={busy} className="h-10 px-5"><MapPin /> {busy ? "Working out the route…" : "Calculate miles"}</Button></div>}
+        {!result && <div><Button type="submit" disabled={busy} className="h-11 px-6"><MapPin /> {busy ? "Working out the route…" : "Calculate miles"}</Button></div>}
       </form>
 
       {result && (
@@ -157,7 +157,7 @@ export function JourneyForm() {
           </Suspense>
           <div className="flex flex-wrap items-baseline justify-between gap-x-6 gap-y-1">
             <div>
-              <div className="num font-display text-[28px] font-bold leading-none tracking-[-0.02em]">{plural(total, "mile")}</div>
+              <div className="num font-display text-[28px] font-medium leading-none">{plural(total, "mile")}</div>
               <div className="mt-1 text-[12.5px] text-muted-foreground">
                 {result.from.label} → {result.to.label} · {result.route.miles} mi each way{returnTrip ? ", there and back" : ""}
                 {result.route.minutes ? ` · about ${result.route.minutes} min drive` : ""}
@@ -173,9 +173,9 @@ export function JourneyForm() {
             <MoneyField id="j-rate" label="Rate per mile" value={rate} onChange={(e) => setRate(e.target.value)} />
             {data.clients.length > 0 ? (
               <div className="grid gap-1.5">
-                <Label htmlFor="j-client" className="text-xs font-semibold text-muted-foreground">Pharmacy</Label>
+                <Label htmlFor="j-client" className="text-[12.5px] font-normal text-muted-foreground">Pharmacy</Label>
                 <Select value={clientId || "none"} onValueChange={(v) => setClientId(v === "none" ? "" : v)}>
-                  <SelectTrigger id="j-client" className="h-10 bg-card text-[14.5px] shadow-none"><SelectValue /></SelectTrigger>
+                  <SelectTrigger id="j-client" className="h-11 bg-field text-[15px]"><SelectValue /></SelectTrigger>
                   <SelectContent>
                     {data.clients.map((c) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
                     <SelectItem value="none">Not for a particular pharmacy</SelectItem>
@@ -185,8 +185,8 @@ export function JourneyForm() {
             ) : <div />}
           </div>
           <div className="flex flex-wrap gap-2">
-            <Button className="h-10 px-5" onClick={addToLog}>Add {plural(total, "mile")} to log</Button>
-            <Button variant="ghost" className="h-10" onClick={() => setResult(null)}>Change journey</Button>
+            <Button className="h-11 px-6" onClick={addToLog}>Add {plural(total, "mile")} to log</Button>
+            <Button variant="ghost" className="h-11" onClick={() => setResult(null)}>Change journey</Button>
           </div>
           <p className="text-[12px] text-muted-foreground">Adding saves this journey, so next time it’s one tap. The miles go on your next invoice to that pharmacy, and count towards your HMRC mileage allowance on the Tax tab.</p>
         </div>

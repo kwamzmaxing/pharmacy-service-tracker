@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { toast } from "sonner"
 import { onAuthStateChanged, signOut, type User } from "firebase/auth"
-import { LogOut, MessageSquare, UserRound } from "lucide-react"
+import { LogOut, MessageSquare, Monitor, Moon, Sun, UserRound } from "lucide-react"
 import { Toaster } from "@/components/ui/sonner"
 import { Button } from "@/components/ui/button"
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuRadioGroup, DropdownMenuRadioItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
+import { applyTheme, resolveTheme, themePref, type ThemePref } from "@/lib/theme"
 import { cn } from "@/lib/utils"
 import { isConfigured } from "@/config"
 import { auth } from "@/lib/firebase"
@@ -33,15 +34,22 @@ const PROBLEM_TEXT: Record<SaveProblem, string> = {
   failed: "Couldn’t save. Try again.",
 }
 
+/** The ℞ mark: ivory on graphite, quiet like the rest of the interface. */
+export function Mark({ size = "md" }: { size?: "md" | "lg" }) {
+  return (
+    <div aria-hidden className={cn("flex flex-none items-center justify-center rounded-lg bg-secondary font-display font-medium text-foreground", size === "lg" ? "size-11 text-[24px]" : "size-9 text-[20px]")}>℞</div>
+  )
+}
+
 function Splash({ message, children }: { message: string; children?: React.ReactNode }) {
   return (
-    <div className="min-h-screen bg-header">
-      <div className="wrap flex min-h-screen flex-col justify-center gap-5 py-10 text-header-fg">
+    <div className="min-h-screen bg-background">
+      <div className="wrap flex min-h-screen flex-col justify-center gap-5 py-10">
         <div className="flex items-center gap-3">
-          <div className="flex size-10 items-center justify-center rounded-[11px] border border-white/20 bg-white/10 font-display text-[23px] font-bold">℞</div>
-          <h1 className="font-display text-[19px] font-bold text-white">Service Tracker</h1>
+          <Mark size="lg" />
+          <h1 className="font-display text-[20px] font-medium">Service Tracker</h1>
         </div>
-        <p className="max-w-md text-[14px]">{message}</p>
+        <p className="max-w-md text-[15px] text-muted-foreground">{message}</p>
         {children}
       </div>
     </div>
@@ -66,6 +74,17 @@ export default function App() {
   const [emailReq, setEmailReq] = useState<{ id: string; kind: EmailKind; fromFollowUps: boolean } | null>(null)
   const [followOpen, setFollowOpen] = useState(false)
   const [feedbackOpen, setFeedbackOpen] = useState(false)
+  const [theme, setThemeState] = useState<ThemePref>(themePref)
+  const [resolvedTheme, setResolvedTheme] = useState<"dark" | "light">(() => resolveTheme(themePref()))
+  const setTheme = useCallback((p: ThemePref) => { setThemeState(p); setResolvedTheme(applyTheme(p)) }, [])
+  // "Match my device" follows the device when it switches between light and dark
+  useEffect(() => {
+    if (theme !== "system") return
+    const mq = window.matchMedia("(prefers-color-scheme: dark)")
+    const on = () => setResolvedTheme(applyTheme("system"))
+    mq.addEventListener("change", on)
+    return () => mq.removeEventListener("change", on)
+  }, [theme])
   const [clientView, setClientView] = useState<string | null>(null)
   const [google, setGoogle] = useState<Record<GoogleArea, ConnStatus>>({ gmail: googleStatus("gmail"), calendar: googleStatus("calendar"), sheets: googleStatus("sheets") })
   const [admin, setAdmin] = useState(false)
@@ -207,7 +226,7 @@ export default function App() {
   const api = useMemo<AppApi | null>(() => {
     if (!data || !me) return null
     return {
-      data, me, commit, replaceAll, ask, go, google, connect, isAdmin: admin, settings, setSettings, outbox, refreshOutbox,
+      data, me, commit, replaceAll, ask, go, google, connect, isAdmin: admin, settings, setSettings, outbox, refreshOutbox, theme, setTheme,
       disconnectGoogle: () => { disconnect(); refreshGoogle(); toast("Google disconnected on this device") },
       viewInvoice: (id, justCreated = false) => setInvoiceView({ id, justCreated }),
       openClient: (id) => { setClientView(id); setTab("clients"); window.scrollTo({ top: 0 }) },
@@ -218,15 +237,15 @@ export default function App() {
       logOut: () => leave("You’ve logged out."),
       accountDeleted: () => leave("Your account was deleted."),
     }
-  }, [data, me, commit, replaceAll, ask, go, google, connect, admin, settings, outbox, refreshOutbox, leave, clientView])
+  }, [data, me, commit, replaceAll, ask, go, google, connect, admin, settings, outbox, refreshOutbox, leave, clientView, theme, setTheme])
 
   const confirm = <ConfirmDialog req={askReq} onDone={(ok) => { askResolve.current?.(ok); askResolve.current = null; setAskReq(null) }} />
-  const toaster = <Toaster position="bottom-center" toastOptions={{ style: { fontFamily: "Figtree, system-ui, sans-serif" } }} />
+  const toaster = <Toaster theme={resolvedTheme} position="bottom-center" toastOptions={{ style: { fontFamily: "Inter, system-ui, sans-serif", borderRadius: 14 } }} />
 
   if (!isConfigured)
     return <Splash message="This copy of the tracker isn’t connected to Firebase yet. Fill in src/config.ts with your Firebase project’s web settings (see SETUP.md), then rebuild." />
   if (phase === "error")
-    return <><Splash message="Your tracker can’t be reached right now. Check your connection and try again."><div><Button className="bg-white text-[hsl(var(--header))] hover:bg-white/90" onClick={() => auth.currentUser && openUser(auth.currentUser)}>Try again</Button></div></Splash>{toaster}</>
+    return <><Splash message="Your tracker can’t be reached right now. Check your connection and try again."><div><Button onClick={() => auth.currentUser && openUser(auth.currentUser)}>Try again</Button></div></Splash>{toaster}</>
   if (phase === "auth") return <><AuthScreen notice={authNotice} />{toaster}</>
   if (phase !== "ready" || !api || !data || !me) return <Splash message={phase === "loading" ? "Opening your tracker…" : "Starting…"} />
 
@@ -237,49 +256,59 @@ export default function App() {
   return (
     <AppCtx.Provider value={api}>
       <div className="min-h-screen pb-12">
-        <header className="sticky top-[env(safe-area-inset-top,0px)] z-40 border-b bg-card/95 backdrop-blur supports-[backdrop-filter]:bg-card/85">
+        <header className="sticky top-[env(safe-area-inset-top,0px)] z-40 bg-background/90 backdrop-blur-md supports-[backdrop-filter]:bg-background/75">
           <div className="wrap">
-            <div className="flex items-center justify-between gap-3 pb-2 pt-3.5">
-              <div className="flex min-w-0 items-center gap-2.5">
-                <div className="flex size-8 flex-none items-center justify-center rounded-md bg-primary font-display text-[19px] font-bold text-primary-foreground" aria-hidden>℞</div>
-                <h1 className="font-display text-[17px] font-bold tracking-[-0.015em]">Service Tracker</h1>
+            <div className="flex items-center justify-between gap-3 pb-3 pt-4">
+              <div className="flex min-w-0 items-center gap-3">
+                <Mark />
+                <h1 className="font-display text-[17px] font-medium">Service Tracker</h1>
               </div>
               <DropdownMenu>
-                <DropdownMenuTrigger aria-label="Account menu" className="flex min-w-0 items-center gap-2 rounded-full py-1 pl-3 pr-1 text-[13px] text-muted-foreground hover:bg-secondary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                <DropdownMenuTrigger aria-label="Account menu" className="flex min-w-0 items-center gap-2 rounded-full py-1 pl-3.5 pr-1 text-[13.5px] text-muted-foreground hover:bg-secondary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
                   <span className="hidden max-w-[180px] truncate sm:inline">{name}</span>
-                  <span className="flex size-8 flex-none items-center justify-center rounded-full bg-accent text-[12.5px] font-bold text-accent-foreground">{initials(name)}</span>
+                  <span className="flex size-8 flex-none items-center justify-center rounded-full bg-secondary text-[12.5px] font-medium text-foreground">{initials(name)}</span>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-60">
+                <DropdownMenuContent align="end" className="w-64 rounded-xl">
                   <DropdownMenuLabel className="font-normal">
-                    <div className="truncate text-sm font-semibold">{name}</div>
+                    <div className="truncate text-sm font-medium">{name}</div>
                     <div className="truncate text-xs text-muted-foreground">{me.email}</div>
                   </DropdownMenuLabel>
                   <DropdownMenuSeparator />
-                  <DropdownMenuItem onSelect={() => go("account")}><UserRound /> Account & email</DropdownMenuItem>
+                  <DropdownMenuItem onSelect={() => go("account")}><UserRound /> Settings</DropdownMenuItem>
                   <DropdownMenuItem onSelect={() => setFeedbackOpen(true)}><MessageSquare /> Send feedback</DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuLabel className="pb-1 text-xs font-normal text-muted-foreground">Appearance</DropdownMenuLabel>
+                  <DropdownMenuRadioGroup value={theme} onValueChange={(v) => setTheme(v as ThemePref)}>
+                    <DropdownMenuRadioItem value="dark" onSelect={(e) => e.preventDefault()}><Moon /> Dark</DropdownMenuRadioItem>
+                    <DropdownMenuRadioItem value="light" onSelect={(e) => e.preventDefault()}><Sun /> Light</DropdownMenuRadioItem>
+                    <DropdownMenuRadioItem value="system" onSelect={(e) => e.preventDefault()}><Monitor /> Match my device</DropdownMenuRadioItem>
+                  </DropdownMenuRadioGroup>
+                  <DropdownMenuSeparator />
                   <DropdownMenuItem onSelect={() => api.logOut()}><LogOut /> Log out</DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
             </div>
-            <nav className="-mx-2 flex overflow-x-auto px-2 [scrollbar-width:none]" aria-label="Sections">
-              {TABS.map(([k, l]) => (
-                <button key={k} type="button" aria-current={(SECTION[tab] ?? tab) === k ? "page" : undefined} onClick={() => go(k)}
-                  className={cn(
-                    "relative flex flex-none items-center gap-1.5 whitespace-nowrap px-3 pb-2.5 pt-1.5 text-[14px] font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring",
-                    "after:absolute after:inset-x-3 after:bottom-0 after:h-[2px] after:rounded-full",
-                    (SECTION[tab] ?? tab) === k ? "text-foreground after:bg-primary" : "text-muted-foreground hover:text-foreground after:bg-transparent",
-                  )}>
-                  {l}
-                  {k === "invoices" && due > 0 && (
-                    <span className="inline-flex h-[17px] min-w-[17px] items-center justify-center rounded-full bg-destructive px-1 text-[10.5px] font-bold text-destructive-foreground" aria-label={`${due} follow-ups due`}>{due}</span>
-                  )}
-                </button>
-              ))}
+            <nav className="-mx-1 flex gap-1 overflow-x-auto px-1 pb-3 [scrollbar-width:none]" aria-label="Sections">
+              {TABS.map(([k, l]) => {
+                const on = (SECTION[tab] ?? tab) === k
+                return (
+                  <button key={k} type="button" aria-current={on ? "page" : undefined} onClick={() => go(k)}
+                    className={cn(
+                      "flex flex-none items-center gap-1.5 whitespace-nowrap rounded-full px-4 py-2 text-[14px] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                      on ? "bg-secondary text-foreground" : "text-muted-foreground hover:text-foreground",
+                    )}>
+                    {l}
+                    {k === "invoices" && due > 0 && (
+                      <span className="inline-flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-destructive px-1 text-[11px] font-medium text-destructive-foreground" aria-label={`${due} follow-ups due`}>{due}</span>
+                    )}
+                  </button>
+                )
+              })}
             </nav>
           </div>
         </header>
 
-        <main className="wrap pt-5">
+        <main className="wrap pt-4">
           {tab === "log" && <LogTab />}
           {tab === "summary" && <SummaryTab />}
           {tab === "invoices" && <InvoicesTab />}
