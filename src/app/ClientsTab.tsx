@@ -153,7 +153,7 @@ function ClientProfile({ c, onBack }: { c: Client; onBack: () => void }) {
       />
 
       <Panel title="Invoices" aside={<Button size="sm" variant="outline" onClick={() => { commit((d) => void (d.meta.lastClientId = c.id)); go("summary") }}>New invoice</Button>}>
-        {!invs.length ? <Empty title="No invoices yet">Pick {c.name} on the Summary tab when you create an invoice.</Empty> : (
+        {!invs.length ? <Empty title="No invoices yet">Choose {c.name} when you create an invoice (Invoices → Create invoice).</Empty> : (
           <ul className="-mx-2 divide-y">
             {invs.map((i) => {
               const st = invStatus(i)

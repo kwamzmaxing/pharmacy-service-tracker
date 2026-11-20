@@ -1,7 +1,7 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { toast } from "sonner"
 import { onAuthStateChanged, signOut, type User } from "firebase/auth"
-import { House, LogOut, MessageSquare, Monitor, Moon, Sun, UserRound } from "lucide-react"
+import { Calculator, Ellipsis, FileText, House, LogOut, MessageSquare, NotebookPen, Receipt, Settings as SettingsIcon, ShieldCheck, Store, Monitor, Moon, Sun, UserRound } from "lucide-react"
 import { Toaster } from "@/components/ui/sonner"
 import { Button } from "@/components/ui/button"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuRadioGroup, DropdownMenuRadioItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
@@ -18,14 +18,18 @@ import { AuthScreen } from "@/app/AuthScreen"
 import { BRAND, CONTACT_EMAIL, PRIVACY_URL, TAGLINE, Wordmark } from "@/app/brand"
 import { LogTab } from "@/app/LogTab"
 import { HomeTab } from "@/app/HomeTab"
-import { SummaryTab } from "@/app/SummaryTab"
+import { Welcome } from "@/app/Welcome"
 import { InvoicesTab } from "@/app/InvoicesTab"
-import { ServicesTab } from "@/app/ServicesTab"
-import { AccountTab } from "@/app/AccountTab"
-import { ClientsTab } from "@/app/ClientsTab"
-import { ExpensesTab } from "@/app/ExpensesTab"
-import { TaxTab } from "@/app/TaxTab"
-import { AdminTab, processOutbox } from "@/app/AdminTab"
+
+// Less-used sections load when first opened, keeping the first download small
+const named = <K extends string>(load: () => Promise<Record<K, React.ComponentType>>, k: K) => lazy(() => load().then((m) => ({ default: m[k] })))
+const SummaryTab = named(() => import("@/app/SummaryTab"), "SummaryTab")
+const ServicesTab = named(() => import("@/app/ServicesTab"), "ServicesTab")
+const AccountTab = named(() => import("@/app/AccountTab"), "AccountTab")
+const ClientsTab = named(() => import("@/app/ClientsTab"), "ClientsTab")
+const ExpensesTab = named(() => import("@/app/ExpensesTab"), "ExpensesTab")
+const TaxTab = named(() => import("@/app/TaxTab"), "TaxTab")
+const AdminTab = named(() => import("@/app/AdminTab"), "AdminTab")
 
 const BASE_TABS: [Tab, string][] = [["home", "Home"], ["log", "Log"], ["invoices", "Invoices"], ["expenses", "Expenses"], ["tax", "Tax"], ["clients", "Pharmacies"], ["account", "Settings"]]
 /** Pages without their own tab light up the tab they belong to. */
@@ -63,6 +67,38 @@ function SiteFooter({ onFeedback, onHome }: { onFeedback: () => void; onHome: ()
   )
 }
 
+/** Phones: the four most-used sections and "More" in a bar at the bottom, within thumb reach. */
+const MAIN_TABS: [Tab, string, React.ReactNode][] = [["home", "Home", <House />], ["log", "Log", <NotebookPen />], ["invoices", "Invoices", <FileText />], ["expenses", "Expenses", <Receipt />]]
+function BottomNav({ tab, go, due, admin }: { tab: Tab; go: (t: Tab) => void; due: number; admin: boolean }) {
+  const more: [Tab, string, React.ReactNode][] = [["tax", "Tax", <Calculator />], ["clients", "Pharmacies", <Store />], ["account", "Settings", <SettingsIcon />], ...(admin ? [["admin", "Admin", <ShieldCheck />] as [Tab, string, React.ReactNode]] : [])]
+  const inMore = more.some(([k]) => k === tab)
+  const item = "relative flex min-w-0 flex-1 flex-col items-center gap-1 rounded-xl py-2 text-[11px] font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring [&_svg]:size-[22px]"
+  return (
+    <nav aria-label="Sections" className="fixed inset-x-0 bottom-0 z-40 border-t border-border/60 bg-background/90 px-2 pb-[max(env(safe-area-inset-bottom),6px)] pt-1.5 backdrop-blur-md supports-[backdrop-filter]:bg-background/80 sm:hidden">
+      <div className="mx-auto flex max-w-md gap-1">
+        {MAIN_TABS.map(([k, l, icon]) => (
+          <button key={k} type="button" aria-current={tab === k ? "page" : undefined} onClick={() => go(k)} className={cn(item, tab === k ? "text-foreground" : "text-muted-foreground")}>
+            <span className={cn("flex h-8 w-14 items-center justify-center rounded-full", tab === k && "bg-secondary")}>{icon}</span>
+            {l}
+            {k === "invoices" && due > 0 && <span className="absolute right-[calc(50%-22px)] top-1 inline-flex h-[16px] min-w-[16px] items-center justify-center rounded-full bg-destructive px-1 text-[10px] font-semibold text-destructive-foreground" aria-label={`${due} follow-ups due`}>{due}</span>}
+          </button>
+        ))}
+        <DropdownMenu>
+          <DropdownMenuTrigger aria-label="More sections" className={cn(item, inMore ? "text-foreground" : "text-muted-foreground")}>
+            <span className={cn("flex h-8 w-14 items-center justify-center rounded-full", inMore && "bg-secondary")}><Ellipsis /></span>
+            {inMore ? more.find(([k]) => k === tab)?.[1] : "More"}
+          </DropdownMenuTrigger>
+          <DropdownMenuContent side="top" align="end" sideOffset={10} className="w-52 rounded-xl">
+            {more.map(([k, l, icon]) => (
+              <DropdownMenuItem key={k} onSelect={() => go(k)} className={cn("gap-3 py-2.5 text-[14px]", tab === k && "bg-secondary")}>{icon}{l}</DropdownMenuItem>
+            ))}
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
+    </nav>
+  )
+}
+
 const meFrom = (u: User): Me => ({
   uid: u.uid,
   email: u.email || "",
@@ -78,6 +114,7 @@ export default function App() {
   const [authNotice, setAuthNotice] = useState("")
   const [tab, setTab] = useState<Tab>("home")
   const [logMode, setLogMode] = useState<LogMode>("service")
+  const [welcome, setWelcome] = useState(false)
   const [invoiceView, setInvoiceView] = useState<{ id: string; justCreated: boolean } | null>(null)
   const [emailReq, setEmailReq] = useState<{ id: string; kind: EmailKind; fromFollowUps: boolean } | null>(null)
   const [followOpen, setFollowOpen] = useState(false)
@@ -104,7 +141,6 @@ export default function App() {
   const vaultRef = useRef<Vault | null>(null)
   const unwatch = useRef<(() => void) | null>(null)
   const lastProblem = useRef(0)
-  const autoSent = useRef(false)
 
   const ask = useCallback((o: AskOptions) => new Promise<boolean>((res) => { askResolve.current = res; setAskReq(o) }), [])
   const onProblem = useCallback((p: SaveProblem) => {
@@ -134,14 +170,15 @@ export default function App() {
       d = newData(m.name)
       d.profile.email = m.email
     }
-    // Saves a new tracker, and keeps any one-off upgrades from loading (only changed parts are written)
-    await vault.save(d)
+    // Saves a new tracker, and keeps any one-off upgrades from loading (only changed parts are written).
+    // Not awaited: with weak or no signal the save waits for the server, and the tracker should open anyway.
+    vault.save(d).catch(() => {})
     dataRef.current = d
     setData(d)
     setMe(m)
-    setTab(isNew ? "account" : "home")
+    setTab("home")
+    setWelcome(isNew)
     setPhase("ready")
-    if (isNew) toast("Welcome. Add your invoice details to get started.")
     if (followUpsDue(d).length) setTimeout(() => setFollowOpen(true), 400)
     recordPerson(u.uid, { name: d.profile.fullName || m.name, email: m.email, isNew }).catch(() => {})
     unwatch.current?.()
@@ -187,13 +224,14 @@ export default function App() {
     }
   }, [me])
   useEffect(() => { if (phase === "ready") refreshOutbox() }, [phase, refreshOutbox])
-  // The admin can have waiting emails sent when they open the tracker (needs a Gmail token from this visit)
+  // Fetch the other sections in the background once the tracker is open, so they still open with no signal later
   useEffect(() => {
-    if (phase !== "ready" || !admin || !settings?.autoSend || autoSent.current || !me) return
-    autoSent.current = true
-    processOutbox(me.email, true).then((r) => { if (r.done || r.failed) toast(`Sent ${r.done} waiting email${r.done === 1 ? "" : "s"}${r.failed ? `, ${r.failed} couldn’t be sent` : ""}`) }).catch(() => {})
-  }, [phase, admin, settings, me])
-
+    if (phase !== "ready") return
+    const t = setTimeout(() => {
+      for (const load of [() => import("@/app/SummaryTab"), () => import("@/app/AccountTab"), () => import("@/app/ClientsTab"), () => import("@/app/ExpensesTab"), () => import("@/app/TaxTab"), () => import("@/app/ServicesTab"), () => import("@/lib/pdf")]) load().catch(() => {})
+    }, 2500)
+    return () => clearTimeout(t)
+  }, [phase])
   const commit = useCallback<AppApi["commit"]>((fn, message) => {
     if (!dataRef.current || !vaultRef.current) return
     const next = structuredClone(dataRef.current)
@@ -210,7 +248,7 @@ export default function App() {
     vaultRef.current.save(d)
     if (message) toast(message)
   }, [])
-  const go = useCallback((t: Tab, mode: LogMode = "service") => { setLogMode(mode); setTab(t); setClientView(null); window.scrollTo({ top: 0 }) }, [])
+  const go = useCallback((t: Tab, mode: LogMode = "service") => { setWelcome(false); setLogMode(mode); setTab(t); setClientView(null); window.scrollTo({ top: 0 }) }, [])
   const leave = useCallback(async (notice: string) => {
     setInvoiceView(null); setEmailReq(null); setFollowOpen(false); setFeedbackOpen(false); setOutbox([])
     disconnect()
@@ -248,7 +286,7 @@ export default function App() {
   }, [data, me, commit, replaceAll, ask, go, google, connect, admin, settings, outbox, refreshOutbox, leave, clientView, theme, setTheme, logMode])
 
   const confirm = <ConfirmDialog req={askReq} onDone={(ok) => { askResolve.current?.(ok); askResolve.current = null; setAskReq(null) }} />
-  const toaster = <Toaster theme={resolvedTheme} position="bottom-center" toastOptions={{ style: { fontFamily: "Inter, system-ui, sans-serif", borderRadius: 14 } }} />
+  const toaster = <Toaster theme={resolvedTheme} position="bottom-center" mobileOffset={{ bottom: "calc(84px + env(safe-area-inset-bottom))" }} toastOptions={{ style: { fontFamily: "Inter, system-ui, sans-serif", borderRadius: 14 } }} />
 
   if (!isConfigured)
     return <Splash message="This copy of the tracker isn’t connected to Firebase yet. Fill in src/config.ts with your Firebase project’s web settings (see SETUP.md), then rebuild." />
@@ -263,7 +301,7 @@ export default function App() {
 
   return (
     <AppCtx.Provider value={api}>
-      <div className="min-h-screen pb-12">
+      <div className="min-h-screen pb-28 sm:pb-12">
         <header className="sticky top-[env(safe-area-inset-top,0px)] z-40 bg-background/90 backdrop-blur-md supports-[backdrop-filter]:bg-background/75">
           <div className="wrap">
             <div className="flex items-center justify-between gap-3 pb-3 pt-4">
@@ -296,7 +334,7 @@ export default function App() {
                 </DropdownMenuContent>
               </DropdownMenu>
             </div>
-            <nav className="-mx-1 flex gap-1 overflow-x-auto px-1 pb-3 [scrollbar-width:none]" aria-label="Sections">
+            <nav className="-mx-1 hidden gap-1 overflow-x-auto px-1 pb-3 [scrollbar-width:none] sm:flex" aria-label="Sections">
               {TABS.map(([k, l]) => {
                 const on = (SECTION[tab] ?? tab) === k
                 return (
@@ -317,6 +355,8 @@ export default function App() {
         </header>
 
         <main className="wrap pt-4">
+          <Suspense fallback={<p className="py-10 text-center text-[13px] text-muted-foreground">Loading…</p>}>
+          {welcome ? <Welcome onDone={() => { setWelcome(false); go("home") }} /> : <>
           {tab === "home" && <HomeTab />}
           {tab === "log" && <LogTab />}
           {tab === "summary" && <SummaryTab />}
@@ -327,9 +367,12 @@ export default function App() {
           {tab === "tax" && <TaxTab />}
           {tab === "account" && <AccountTab />}
           {tab === "admin" && admin && <AdminTab />}
+          </>}
+          </Suspense>
         </main>
         <SiteFooter onFeedback={() => setFeedbackOpen(true)} onHome={() => go("home")} />
       </div>
+      <BottomNav tab={SECTION[tab] ?? tab} go={go} due={due} admin={admin} />
 
       <InvoiceDialog id={invoiceView?.id ?? null} justCreated={!!invoiceView?.justCreated} onClose={() => setInvoiceView(null)} />
       <EmailDialog req={emailReq} onClose={() => setEmailReq(null)} onBack={emailReq?.fromFollowUps ? () => { setEmailReq(null); setFollowOpen(true) } : undefined} />

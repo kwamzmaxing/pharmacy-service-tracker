@@ -1,6 +1,5 @@
 import { useRef, useState } from "react"
 import { toast } from "sonner"
-import * as XLSX from "xlsx"
 import {
   deleteUser, EmailAuthProvider, GoogleAuthProvider, reauthenticateWithCredential, reauthenticateWithPopup, sendEmailVerification, updatePassword,
 } from "firebase/auth"
@@ -89,7 +88,7 @@ export function AccountTab() {
     saveFile(`pharmacy-tracker-${tag}-${today()}.json`, new Blob([JSON.stringify(data, null, 2)], { type: "application/json" }))
     toast.success("Back-up saved ✓")
   }
-  function excel() {
+  async function excel() {
     if (!data.entries.length && !data.invoices.length) return toast("Nothing to export yet.")
     const svc = (id: string) => data.services.find((s) => s.id === id)?.name ?? ""
     const log = [...data.entries].sort((a, b) => b.date.localeCompare(a.date)).map((e) => ({
@@ -109,6 +108,7 @@ export function AccountTab() {
       Invoice: i.number, Issued: i.issued, Due: i.due, "Billed to": i.to.name || "", Period: i.period, Total: Number(i.total) || 0,
       Status: STATUS_LABEL[invStatus(i)], "Emailed on": i.sentAt ? i.sentAt.slice(0, 10) : "", "Paid on": i.paidDate || "", "Follow-ups sent": i.reminders.length,
     }))
+    const XLSX = await import("xlsx")
     const wb = XLSX.utils.book_new()
     XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(log), "Log")
     XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(summary), "Summary")

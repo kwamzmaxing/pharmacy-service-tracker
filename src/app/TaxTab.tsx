@@ -7,7 +7,6 @@ import { Switch } from "@/components/ui/switch"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { cn } from "@/lib/utils"
 import { categoryName, class4, fmtDate, incomeTax, mileageRates, money, taxSummary, taxYearsWithData, VEHICLES, type Vehicle } from "@/lib/model"
-import { pdfBlob, taxSummaryPdf } from "@/lib/pdf"
 import { saveFile } from "@/lib/store"
 import { useApp } from "./ctx"
 import { Chips, Ledger, MoneyField, Panel } from "./bits"
@@ -34,7 +33,8 @@ export function TaxTab() {
   const setAside = canProject ? projTotal / 12 : t.total / 12
   const rates = mileageRates(p.vehicle || "car", Number(t.year.from.slice(0, 4)))
 
-  function download() {
+  async function download() {
+    const { pdfBlob, taxSummaryPdf } = await import("@/lib/pdf")
     const who = p.tradingName || p.fullName || me.name || me.email
     saveFile(`tax-estimate-${t.year.label.replace("/", "-")}.pdf`, pdfBlob(taxSummaryPdf(t, who, {
       scotland: !!p.scotland, vehicle: VEHICLES.find((v) => v[0] === (p.vehicle || "car"))?.[1] ?? "Car or van", basis: p.taxBasis || "cash", otherIncome: other,
@@ -66,7 +66,7 @@ export function TaxTab() {
         { label: current ? "Taxable profit so far" : "Taxable profit", value: money(t.profit), sub: `${money(t.income)} income` },
         { label: current ? "Tax and NI so far" : "Tax and NI", value: money(t.total), sub: "Income tax and Class 4 NI" },
         { label: "Full-year estimate", value: canProject ? money(projTotal) : current ? "—" : money(t.total), sub: canProject ? "At this year’s pace" : current ? "Shows after the first month" : "This tax year has ended" },
-        { label: "Set aside each month", value: money(setAside), sub: current ? `${monthsLeft} months left in the tax year` : "Average across the year" },
+        { label: "Set aside each month", value: money(setAside), sub: current ? `${monthsLeft} months to go` : "Average across the year" },
       ]} />
 
       <Panel title="How it’s worked out" aside={`${t.year.label} · ${p.scotland ? "Scottish rates" : "UK rates"}`}>

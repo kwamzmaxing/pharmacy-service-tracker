@@ -5,33 +5,23 @@ import { Copy, ExternalLink, RefreshCw, Send, Sheet, Star } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Switch } from "@/components/ui/switch"
 import { cn } from "@/lib/utils"
-import { fmtDate, isoOf, plural } from "@/lib/model"
+import { fmtDate, isoOf } from "@/lib/model"
 import { auth } from "@/lib/firebase"
 import { listFeedback, listOutbox, listPeople, markOutbox, saveSettings, type Feedback, type OutboxItem, type Person, type PublicSettings } from "@/lib/cloud"
-import { GOOGLE_HELP, GoogleError, hasToken, sendMail, writeSheet } from "@/lib/google"
+import { GOOGLE_HELP, GoogleError, sendMail, writeSheet } from "@/lib/google"
 import { useApp } from "./ctx"
 import { Empty, Field, Panel } from "./bits"
 
 const when = (iso?: string) => (iso ? fmtDate(isoOf(new Date(iso))) : "—")
 const label = (o: OutboxItem) => `${o.kind === "invoice" ? "Invoice" : "Follow-up"} ${o.invoiceNumber} → ${o.to}`
 
-/** Send emails waiting in the outbox from the admin's Gmail. With `onlyIfReady`, never opens a Google window. */
-export async function processOutbox(hint: string, onlyIfReady = false, only?: string) {
-  if (onlyIfReady && !hasToken("gmail")) return { done: 0, failed: 0 }
-  const items = (await listOutbox()).filter((o) => o.status === "new" && (!only || o.id === only))
-  let done = 0, failed = 0
-  for (const o of items) {
-    try {
-      await sendMail({ to: o.to, subject: o.subject, body: o.body, attachments: o.attachment ? [o.attachment] : undefined }, hint)
-      await markOutbox(o.id, { status: "done" })
-      done++
-    } catch (e) {
-      if (e instanceof GoogleError && (e.kind === "cancelled" || e.kind === "denied" || e.kind === "unavailable")) throw e
-      await markOutbox(o.id, { status: "failed", error: e instanceof Error ? e.message : "Gmail error" }).catch(() => {})
-      failed++
-    }
-  }
-  return { done, failed }
+/** The line added to every email sent for someone else, so the pharmacy knows who it's really from. */
+const onBehalf = (o: OutboxItem) => `\n\n—\nSent by ${o.name} (${o.email}) using KASA.Rx. Reply to this email to reach ${o.name}.`
+
+/** Send one reviewed email from the admin's Gmail, with replies going to the account holder. */
+async function sendOne(o: OutboxItem, hint: string) {
+  await sendMail({ to: o.to, subject: o.subject, body: o.body + onBehalf(o), replyTo: o.email, attachments: o.attachment ? [o.attachment] : undefined }, hint)
+  await markOutbox(o.id, { status: "done" })
 }
 
 export function AdminTab() {
@@ -65,13 +55,25 @@ export function AdminTab() {
       toast.error("Couldn’t save. Check your connection.")
     }
   }
-  async function sendWaiting(only?: string) {
-    setBusy(only || "all")
+  async function send(o: OutboxItem) {
+    setBusy(o.id)
     try {
-      const r = await processOutbox(me.email, false, only)
-      toast(r.done || r.failed ? `Sent ${plural(r.done, "email")}${r.failed ? `, ${r.failed} couldn’t be sent` : ""}` : "Nothing waiting to send")
+      await sendOne(o, me.email)
+      toast.success(`Sent to ${o.to} ✓`)
     } catch (e) {
-      if (!(e instanceof GoogleError && e.kind === "cancelled")) toast.error("Gmail stopped the send. " + GOOGLE_HELP[e instanceof GoogleError ? e.kind : "failed"])
+      if (!(e instanceof GoogleError && e.kind === "cancelled")) toast.error("Gmail didn’t send it. " + GOOGLE_HELP[e instanceof GoogleError ? e.kind : "failed"] + (e instanceof Error ? ` ${e.message}` : ""))
+    } finally {
+      setBusy("")
+      reload()
+    }
+  }
+  async function reject(o: OutboxItem) {
+    setBusy(o.id)
+    try {
+      await markOutbox(o.id, { status: "failed", error: "Not sent: rejected by the admin" })
+      toast(`Rejected. ${o.name} will see it wasn’t sent.`)
+    } catch {
+      toast.error("Couldn’t update it. Check your connection.")
     } finally {
       setBusy("")
       reload()
@@ -138,28 +140,35 @@ export function AdminTab() {
             <button type="button" className="font-semibold underline-offset-2 hover:underline" onClick={() => connect("gmail")}>Connect Gmail</button>
           </p>
         )}
+        <p className="mb-3 max-w-[64ch] text-[12.5px] text-muted-foreground">
+          These go out from your Gmail, so read each one before sending. Replies go to the account holder, and a line at the end says who it’s from. Reject anything that looks wrong, such as links or requests you wouldn’t send yourself.
+        </p>
         {!waiting.length ? (
-          <Empty title="Nothing waiting">Invoice and follow-up emails that account holders send through you appear here.</Empty>
+          <Empty title="Nothing waiting">Invoice and follow-up emails that account holders send through you appear here for you to check.</Empty>
         ) : (
-          <>
-            <ul className="divide-y">
-              {waiting.map((o) => (
-                <li key={o.id} className="flex flex-wrap items-center justify-between gap-3 py-2.5">
-                  <div className="min-w-0 text-[13px]">
-                    <div className="font-semibold">{label(o)}</div>
-                    <div className="text-[12.5px] text-muted-foreground">{o.name} · {o.email} · {when(o.at)}</div>
+          <ul className="grid gap-3">
+            {waiting.map((o) => (
+              <li key={o.id} className="rounded-xl bg-secondary/60 p-4 text-[13px]">
+                <div className="flex flex-wrap items-start justify-between gap-2">
+                  <div className="min-w-0">
+                    <div className="font-semibold">{o.kind === "invoice" ? "Invoice" : "Follow-up"} {o.invoiceNumber}</div>
+                    <div className="text-[12.5px] text-muted-foreground">From {o.name} · {o.email} · {when(o.at)}</div>
                   </div>
-                  <Button size="sm" variant="outline" disabled={!!busy} onClick={() => sendWaiting(o.id)}><Send /> Send</Button>
-                </li>
-              ))}
-            </ul>
-            <Button className="mt-3" disabled={!!busy} onClick={() => sendWaiting()}><Send /> {busy === "all" ? "Sending…" : `Send all ${waiting.length} from my Gmail`}</Button>
-          </>
+                  <div className="flex gap-1.5">
+                    <Button size="sm" variant="ghost" disabled={!!busy} onClick={() => reject(o)}>Reject</Button>
+                    <Button size="sm" disabled={!!busy || google.gmail !== "ready"} onClick={() => send(o)}><Send /> {busy === o.id ? "Sending…" : "Send"}</Button>
+                  </div>
+                </div>
+                <dl className="mt-3 grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-[12.5px]">
+                  <dt className="text-muted-foreground">To</dt><dd className="min-w-0 break-all font-medium">{o.to}</dd>
+                  <dt className="text-muted-foreground">Subject</dt><dd className="min-w-0 break-words">{o.subject}</dd>
+                  {o.attachment && <><dt className="text-muted-foreground">Attached</dt><dd className="min-w-0 break-all">{o.attachment.filename}</dd></>}
+                </dl>
+                <pre className="mt-3 max-h-56 overflow-auto whitespace-pre-wrap break-words rounded-lg bg-background p-3 font-sans text-[12.5px] leading-relaxed">{o.body + onBehalf(o)}</pre>
+              </li>
+            ))}
+          </ul>
         )}
-        <div className="mt-4 flex items-center justify-between gap-3 border-t pt-3">
-          <label htmlFor="adm-auto" className="text-[13px] text-muted-foreground">Send waiting emails automatically while I have the tracker open and Gmail is connected</label>
-          <Switch id="adm-auto" checked={!!s?.autoSend} onCheckedChange={(v) => update({ autoSend: v })} />
-        </div>
         {recent.length > 0 && (
           <details className="mt-3 text-[12.5px] text-muted-foreground">
             <summary className="cursor-pointer font-semibold">Recently sent</summary>

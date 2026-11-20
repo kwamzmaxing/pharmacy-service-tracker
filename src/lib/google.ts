@@ -127,7 +127,9 @@ async function api(area: GoogleArea, url: string, init: RequestInit & { json?: u
 
 /* ---------- Gmail ---------- */
 export type Attachment = { filename: string; mimeType: string; content: string /* base64 */ }
-export type Mail = { to: string; subject: string; body: string; attachments?: Attachment[] }
+export type Mail = { to: string; subject: string; body: string; attachments?: Attachment[]; replyTo?: string }
+/** Header values can't carry line breaks (which would let someone add their own headers). */
+const oneLine = (s: string) => s.replace(/[\r\n]+/g, " ").trim()
 const b64utf8 = (t: string) => {
   const bytes = new TextEncoder().encode(t)
   let s = ""
@@ -136,8 +138,8 @@ const b64utf8 = (t: string) => {
 }
 const wrap = (b64: string) => b64.replace(/.{1,76}/g, "$&\r\n").trim()
 export function mime(m: Mail) {
-  const to = m.to.split(/[,;\s]+/).filter(Boolean).join(", ")
-  const head = [`To: ${to}`, `Subject: =?UTF-8?B?${b64utf8(m.subject)}?=`, "MIME-Version: 1.0"]
+  const to = oneLine(m.to).split(/[,;\s]+/).filter(Boolean).join(", ")
+  const head = [`To: ${to}`, ...(m.replyTo ? [`Reply-To: ${oneLine(m.replyTo)}`] : []), `Subject: =?UTF-8?B?${b64utf8(oneLine(m.subject))}?=`, "MIME-Version: 1.0"]
   const text = ["Content-Type: text/plain; charset=UTF-8", "Content-Transfer-Encoding: base64", "", wrap(b64utf8(m.body))]
   if (!m.attachments?.length) return [...head, ...text].join("\r\n")
   const boundary = "pst_" + Math.random().toString(36).slice(2)
@@ -145,8 +147,8 @@ export function mime(m: Mail) {
     `--${boundary}`, ...text,
     ...m.attachments.flatMap((a) => [
       `--${boundary}`,
-      `Content-Type: ${a.mimeType}; name="${a.filename}"`,
-      `Content-Disposition: attachment; filename="${a.filename}"`,
+      `Content-Type: ${oneLine(a.mimeType)}; name="${oneLine(a.filename).replace(/"/g, "")}"`,
+      `Content-Disposition: attachment; filename="${oneLine(a.filename).replace(/"/g, "")}"`,
       "Content-Transfer-Encoding: base64",
       "",
       wrap(a.content),

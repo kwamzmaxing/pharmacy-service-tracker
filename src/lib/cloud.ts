@@ -7,7 +7,7 @@
 //   admins/{uid}                exists → that person is an admin (created in the Firebase console)
 //   settings/public             { adminName, relay, sheetId, sheetUrl, sheetUpdatedAt }
 import {
-  addDoc, collection, deleteDoc, doc, getDoc, getDocs, onSnapshot, orderBy, query, serverTimestamp, setDoc, updateDoc, where,
+  addDoc, collection, deleteDoc, doc, getDoc, getDocs, onSnapshot, orderBy, query, serverTimestamp, setDoc, updateDoc, where, writeBatch,
   type Unsubscribe,
 } from "firebase/firestore"
 import { db } from "./firebase"
@@ -82,7 +82,7 @@ export async function wipeVault(uid: string) {
 export type Person = { uid: string; name: string; email: string; created?: string; lastLogin?: string }
 export async function recordPerson(uid: string, p: { name: string; email: string; isNew: boolean }) {
   const now = new Date().toISOString()
-  await setDoc(doc(db, "users", uid), { name: p.name, email: p.email, lastLogin: now, ...(p.isNew ? { created: now } : {}) }, { merge: true })
+  await setDoc(doc(db, "users", uid), { name: p.name.slice(0, 120), email: p.email, lastLogin: now, ...(p.isNew ? { created: now } : {}) }, { merge: true })
 }
 export const forgetPerson = (uid: string) => deleteDoc(doc(db, "users", uid))
 export async function listPeople(): Promise<Person[]> {
@@ -98,7 +98,7 @@ export async function isAdmin(uid: string) {
     return false
   }
 }
-export type PublicSettings = { adminName: string; relay: boolean; autoSend?: boolean; sheetId?: string; sheetUrl?: string; sheetUpdatedAt?: string }
+export type PublicSettings = { adminName: string; relay: boolean; sheetId?: string; sheetUrl?: string; sheetUpdatedAt?: string }
 export async function getSettings(): Promise<PublicSettings | null> {
   try {
     const s = await getDoc(doc(db, "settings", "public"))
@@ -111,7 +111,7 @@ export const saveSettings = (s: Partial<PublicSettings>) => setDoc(doc(db, "sett
 
 /* ---------- feedback ---------- */
 export type Feedback = { id: string; uid: string; name: string; email: string; topic: string; rating: number; message: string; at: string }
-export const sendFeedback = (f: Omit<Feedback, "id" | "at">) => addDoc(collection(db, "feedback"), { ...f, at: new Date().toISOString(), ts: serverTimestamp() })
+export const sendFeedback = (f: Omit<Feedback, "id" | "at">) => addDoc(collection(db, "feedback"), { ...f, name: f.name.slice(0, 120), at: new Date().toISOString(), ts: serverTimestamp() })
 export async function listFeedback(): Promise<Feedback[]> {
   const snap = await getDocs(query(collection(db, "feedback"), orderBy("at", "desc")))
   return snap.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<Feedback, "id">) }))
@@ -135,7 +135,22 @@ export type OutboxItem = {
   doneAt?: string
   error?: string
 }
-export const queueEmail = (m: Omit<OutboxItem, "id" | "at" | "status">) => addDoc(collection(db, "outbox"), { ...m, status: "new", at: new Date().toISOString() })
+/** Most emails one person can queue for the admin in a day (also enforced by firestore.rules). */
+export const OUTBOX_DAILY_LIMIT = 10
+export class QueueLimit extends Error {}
+/** Queue an email for the admin to review and send, counting it against today's limit in the same write. */
+export async function queueEmail(m: Omit<OutboxItem, "id" | "at" | "status">) {
+  const quotaRef = doc(db, "outboxQuota", m.uid)
+  const q = await getDoc(quotaRef)
+  const day = Math.floor(Date.now() / 86400000)
+  const prev = q.exists() && q.data().day === day ? Number(q.data().n) || 0 : 0
+  if (prev >= OUTBOX_DAILY_LIMIT) throw new QueueLimit()
+  const ref = doc(collection(db, "outbox"))
+  const batch = writeBatch(db)
+  batch.set(ref, { ...m, status: "new", at: new Date().toISOString() })
+  batch.set(quotaRef, { day, n: prev + 1, last: ref.id })
+  await batch.commit()
+}
 export async function myOutbox(uid: string): Promise<OutboxItem[]> {
   const snap = await getDocs(query(collection(db, "outbox"), where("uid", "==", uid)))
   return snap.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<OutboxItem, "id">) }))

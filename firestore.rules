@@ -6,12 +6,24 @@ service cloud.firestore {
     function me(uid) { return signedIn() && request.auth.uid == uid; }
     // You make someone an admin by creating admins/<their user ID> in the Firebase console.
     function isAdmin() { return signedIn() && exists(/databases/$(database)/documents/admins/$(request.auth.uid)); }
+    function str(v, max) { return v is string && v.size() <= max; }
+    // One plain address: no spaces, commas, angle brackets or line breaks (so nothing can be added to an email's headers)
+    function oneEmail(v) { return str(v, 254) && v.matches('^[^@\\s,;<>"]+@[^@\\s,;<>"]+[.][^@\\s,;<>"]+$'); }
+    function pdfAttachment(a) {
+      return a is map && a.keys().hasOnly(['filename', 'mimeType', 'content'])
+        && a.mimeType == 'application/pdf'
+        && str(a.filename, 80) && a.filename.matches('^[A-Za-z0-9 ._-]+[.]pdf$')
+        && str(a.content, 700000);
+    }
+    function today() { return math.floor(request.time.toMillis() / 86400000); }
 
     // The person's name/email for the admin list; only they can change it.
     match /users/{uid} {
       allow read: if me(uid) || isAdmin();
       allow create, update: if me(uid)
-        && request.resource.data.keys().hasOnly(['name', 'email', 'created', 'lastLogin']);
+        && request.resource.data.keys().hasOnly(['name', 'email', 'created', 'lastLogin'])
+        && str(request.resource.data.name, 120)
+        && request.resource.data.email == request.auth.token.email;
       allow delete: if me(uid);
 
       // The person's tracker: nobody else, not even the admin, can read it.
@@ -27,15 +39,49 @@ service cloud.firestore {
 
     match /feedback/{id} {
       allow create: if signedIn() && request.resource.data.uid == request.auth.uid
-        && request.resource.data.message is string && request.resource.data.message.size() < 5000;
+        && request.resource.data.keys().hasOnly(['uid', 'name', 'email', 'topic', 'rating', 'message', 'at', 'ts'])
+        && request.resource.data.email == request.auth.token.email
+        && str(request.resource.data.name, 120) && str(request.resource.data.topic, 60)
+        && request.resource.data.rating is int && request.resource.data.rating >= 0 && request.resource.data.rating <= 5
+        && str(request.resource.data.message, 5000);
       allow read, delete: if isAdmin();
     }
 
     // Emails an account holder asks the admin to send from the admin's Gmail.
+    // Nothing is sent automatically: the admin reads and sends (or rejects) each one.
+    // Only people with a confirmed email can queue, one plain recipient each, a PDF at most,
+    // and no more than 10 a day (counted in outboxQuota, written in the same batch).
     match /outbox/{id} {
-      allow create: if signedIn() && request.resource.data.uid == request.auth.uid && request.resource.data.status == 'new';
+      allow create: if signedIn()
+        && request.auth.token.email_verified == true
+        && request.resource.data.keys().hasOnly(['uid', 'name', 'email', 'kind', 'invoiceId', 'invoiceNumber', 'to', 'subject', 'body', 'attachment', 'status', 'at'])
+        && request.resource.data.keys().hasAll(['uid', 'name', 'email', 'kind', 'invoiceId', 'invoiceNumber', 'to', 'subject', 'body', 'status', 'at'])
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.email == request.auth.token.email
+        && request.resource.data.status == 'new'
+        && request.resource.data.kind in ['invoice', 'followup']
+        && oneEmail(request.resource.data.to)
+        && str(request.resource.data.name, 120)
+        && str(request.resource.data.invoiceId, 64) && str(request.resource.data.invoiceNumber, 40)
+        && str(request.resource.data.subject, 200) && str(request.resource.data.body, 6000)
+        && str(request.resource.data.at, 40)
+        && (!('attachment' in request.resource.data) || pdfAttachment(request.resource.data.attachment))
+        && getAfter(/databases/$(database)/documents/outboxQuota/$(request.auth.uid)).data.last == id;
       allow read: if isAdmin() || (signedIn() && resource.data.uid == request.auth.uid);
       allow update, delete: if isAdmin();
+    }
+
+    // How many emails each person has queued today. Each new outbox item must bump this in the same write.
+    match /outboxQuota/{uid} {
+      allow read: if me(uid) || isAdmin();
+      allow create, update: if me(uid)
+        && request.resource.data.keys().hasOnly(['day', 'n', 'last'])
+        && request.resource.data.day == today()
+        && request.resource.data.n == ((resource == null || resource.data.day != today()) ? 1 : resource.data.n + 1)
+        && request.resource.data.n <= 10
+        && request.resource.data.last is string
+        && !exists(/databases/$(database)/documents/outbox/$(request.resource.data.last))
+        && existsAfter(/databases/$(database)/documents/outbox/$(request.resource.data.last));
     }
 
     match /admins/{uid} {

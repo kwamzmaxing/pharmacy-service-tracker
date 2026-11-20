@@ -74,7 +74,7 @@ export function InvoicesTab() {
         cells={[
           { label: "Owed to you", value: money(sum(out)), sub: out.length ? plural(out.length, "unpaid invoice") : "Nothing outstanding" },
           { label: "Overdue", value: money(sum(od)), sub: od.length ? plural(od.length, "invoice") : "None", alert: od.length > 0 },
-          { label: `Paid in ${ty.label} tax year`, value: money(paidThisYear), sub: "6 April to 5 April" },
+          { label: "Paid this tax year", value: money(paidThisYear), sub: `${ty.label} · from 6 April` },
           { label: "Average time to pay", value: avgDays === null ? "—" : plural(avgDays, "day"), sub: avgDays === null ? "Shows once invoices are paid" : "From invoice to payment" },
         ]}
       />
@@ -143,8 +143,7 @@ export function InvoicesTab() {
         {data.invoices.length > 0 && <div className="mb-3"><Chips<Filter> label="Show" value={filter} onChange={setFilter} options={[["all", "All"], ["unpaid", "Unpaid"], ["overdue", "Overdue"], ["paid", "Paid"]]} /></div>}
         {!data.invoices.length ? (
           <Empty title="No invoices yet">
-            Create one from the Summary tab and it’ll be saved here.
-            <div className="mt-3"><Button size="sm" onClick={() => go("summary")}>Go to Summary</Button></div>
+            Use <b className="font-medium text-foreground">Create invoice</b> to turn the work you’ve logged into an invoice. It’ll be saved here.
           </Empty>
         ) : !rows.length ? (
           <Empty title={`No ${filter} invoices`} />

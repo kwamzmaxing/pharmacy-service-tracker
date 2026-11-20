@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react"
 import { toast } from "sonner"
-import * as XLSX from "xlsx"
 import { Camera, Download, Plus, Receipt, Trash2, X } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
@@ -41,7 +40,7 @@ export function ExpensesTab() {
     if (x.receiptId) deleteReceipt(me.uid, x.receiptId).catch(() => {})
   }
 
-  function exportYear() {
+  async function exportYear() {
     if (!inYear.length) return toast("No expenses in this tax year yet.")
     const client = (id?: string) => data.clients.find((c) => c.id === id)?.name ?? ""
     const rows = [...inYear].reverse().map((x) => ({ Date: x.date, Category: categoryName(x.category), Description: x.desc, Pharmacy: client(x.clientId), Amount: Number(x.amount) || 0, Receipt: x.receiptId ? "Yes" : "" }))
@@ -56,6 +55,7 @@ export function ExpensesTab() {
     for (const [c, name] of EXPENSE_CATEGORIES) totals[name] = sum(inYear.filter((x) => x.category === c))
     totals.Total = sum(inYear)
     summary.push(totals)
+    const XLSX = await import("xlsx")
     const wb = XLSX.utils.book_new()
     XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(summary), "Monthly summary")
     XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rows), "Expenses")
@@ -82,7 +82,7 @@ export function ExpensesTab() {
       <Ledger cells={[
         { label: `Expenses ${ty.label}`, value: money(sum(inYear)), sub: plural(inYear.length, "expense") },
         { label: "This month", value: money(sum(thisMonth)), sub: plural(thisMonth.length, "expense") },
-        { label: "Receipts saved", value: String(inYear.filter((x) => x.receiptId).length), sub: `of ${inYear.length} this tax year` },
+        { label: "Receipts saved", value: String(inYear.filter((x) => x.receiptId).length), sub: `of ${inYear.length} this year` },
         { label: "Biggest category", value: byCat[0] ? byCat[0].name : "—", sub: byCat[0] ? money(byCat[0].amount) : "Nothing yet" },
       ]} />
 

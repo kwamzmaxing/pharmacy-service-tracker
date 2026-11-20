@@ -120,9 +120,9 @@ export function Ledger({ cells }: { cells: { label: string; value: string; sub?:
     <div className="grid grid-cols-2 gap-[2px] overflow-hidden rounded-xl sm:grid-cols-4">
       {cells.map((c) => (
         <div key={c.label} className={cn("min-w-0 bg-card px-5 py-4 sm:py-5", c.alert && "bg-danger-tint")}>
-          <div className="truncate text-[12.5px] text-muted-foreground">{c.label}</div>
+          <div className="text-[12.5px] leading-snug text-muted-foreground">{c.label}</div>
           <div className={cn("num mt-1.5 truncate font-display text-[clamp(19px,5vw,26px)] font-medium leading-tight sm:text-[21px] md:text-[22px]", c.alert && "text-danger-ink")}>{c.value}</div>
-          {c.sub && <div className="mt-1 truncate text-[12px] text-muted-foreground">{c.sub}</div>}
+          {c.sub && <div className="mt-1 text-[12px] leading-snug text-muted-foreground">{c.sub}</div>}
         </div>
       ))}
     </div>

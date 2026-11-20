@@ -12,11 +12,10 @@ import {
   daysBetween, fmtDate, followUpsDue, invStatus, invoiceEmailText, isoOf, money, plural, reminderText, today, type Data, type Invoice,
 } from "@/lib/model"
 import { saveFile } from "@/lib/store"
-import { invoicePdf, pdfBase64, pdfBlob } from "@/lib/pdf"
-import { queueEmail, sendFeedback } from "@/lib/cloud"
+import { OUTBOX_DAILY_LIMIT, QueueLimit, queueEmail, sendFeedback } from "@/lib/cloud"
 import { addCalendarEvent, calendarLink, GOOGLE_HELP, GoogleError, sendMail } from "@/lib/google"
 import { useApp, type AskOptions, type EmailKind } from "./ctx"
-import { InvoiceDoc, invoiceFile } from "./invoice"
+import { InvoiceDoc } from "./invoice"
 import { Pill } from "./bits"
 
 const STATUS_LABEL = { paid: "Paid", unpaid: "Unpaid", overdue: "Overdue" } as const
@@ -55,8 +54,10 @@ export function ConfirmDialog({ req: live, onDone }: { req: AskOptions | null; o
 }
 
 /* ---------- invoice preview ---------- */
-export function invoiceAttachment(inv: Invoice, logo?: string) {
-  return { filename: `${inv.number}.pdf`, mimeType: "application/pdf", content: pdfBase64(invoicePdf(inv, logo)) }
+/** The invoice as a PDF attachment (the PDF code loads the first time it's needed). */
+export async function invoiceAttachment(inv: Invoice, logo?: string) {
+  const { invoicePdf, pdfBase64 } = await import("@/lib/pdf")
+  return { filename: `${inv.number.replace(/[^A-Za-z0-9 ._-]/g, "-").slice(0, 70) || "invoice"}.pdf`, mimeType: "application/pdf", content: pdfBase64(invoicePdf(inv, logo)) }
 }
 const calDetails = (inv: Invoice) => `Expected payment for ${inv.number} from ${inv.to.name || "the pharmacy"}: ${money(inv.total)}. Logged in KASA.Rx.`
 const calTitle = (inv: Invoice) => `Payment due: ${inv.number} · ${money(inv.total)}`
@@ -83,15 +84,18 @@ export function InvoiceDialog({ id, justCreated, onClose }: { id: string | null;
       setCalBusy(false)
     }
   }
-  function download() {
+  async function download() {
     if (!inv) return
+    const { invoicePdf, pdfBlob } = await import("@/lib/pdf")
     saveFile(inv.number + ".pdf", pdfBlob(invoicePdf(inv, data.profile.logo)))
     toast.success(`${inv.number}.pdf saved ✓`)
   }
-  function print() {
+  async function print() {
     if (!inv) return
+    // Open the window straight from the click (so it isn't blocked), then fill it
     const w = window.open("", "_blank")
     if (!w) return toast.error("Allow pop-ups to print, or use Download instead.")
+    const { invoiceFile } = await import("./invoiceFile")
     w.document.write(invoiceFile(inv))
     w.document.close()
     w.onload = () => w.print()
@@ -169,7 +173,8 @@ export function EmailDialog({ req, onClose, onBack }: { req: { id: string; kind:
   const [attach, setAttach] = useState(true)
   const [busy, setBusy] = useState<Route | null>(null)
   const [note, setNote] = useState("")
-  const relay = !!settings?.relay && !isAdmin
+  // Sending through the admin needs a confirmed email address (checked again by the database rules)
+  const relay = !!settings?.relay && !isAdmin && me.emailVerified
   const mine = google.gmail === "ready"
   const preferred: Route = data.profile.sendVia === "admin" && relay ? "admin" : mine ? "send" : relay ? "admin" : "copy"
   useEffect(() => {
@@ -203,7 +208,7 @@ export function EmailDialog({ req, onClose, onBack }: { req: { id: string; kind:
     setBusy("send")
     setNote("")
     try {
-      await sendMail({ to: to.trim(), subject, body, attachments: attach ? [invoiceAttachment(inv, data.profile.logo)] : undefined }, me.email)
+      await sendMail({ to: to.trim(), subject, body, attachments: attach ? [await invoiceAttachment(inv, data.profile.logo)] : undefined }, me.email)
       record("gmail", `Sent to ${to.trim()} ✓`, true)
       onClose()
     } catch (e) {
@@ -215,19 +220,24 @@ export function EmailDialog({ req, onClose, onBack }: { req: { id: string; kind:
   async function viaAdmin() {
     if (!inv) return
     if (!to.trim()) return setNote("Add the pharmacy’s email address first.")
+    if (!/^[^@\s,;<>"]+@[^@\s,;<>"]+\.[^@\s,;<>"]+$/.test(to.trim())) return setNote("Use one email address in the To box when sending through the admin.")
     setBusy("admin")
     try {
-      const att = attach ? invoiceAttachment(inv, data.profile.logo) : undefined
+      const att = attach ? await invoiceAttachment(inv, data.profile.logo) : undefined
       await queueEmail({
-        uid: me.uid, name: data.profile.fullName || me.name || me.email, email: me.email,
-        kind, invoiceId: inv.id, invoiceNumber: inv.number, to: to.trim(), subject, body,
+        uid: me.uid, name: (data.profile.fullName || me.name || me.email).slice(0, 120), email: me.email,
+        kind, invoiceId: inv.id, invoiceNumber: inv.number, to: to.trim(), subject: subject.slice(0, 200), body: body.slice(0, 6000),
         ...(att && att.content.length < 700_000 ? { attachment: att } : {}),
       })
-      record("admin", `Queued. ${settings?.adminName || "The admin"} will send it from their email.`, false)
+      record("admin", `Queued. ${settings?.adminName || "The admin"} will check it and send it from their email.`, false)
       refreshOutbox()
       onClose()
-    } catch {
-      setNote("Couldn’t queue the email. Check your connection and try again.")
+    } catch (e) {
+      setNote(e instanceof QueueLimit
+        ? `You can send up to ${OUTBOX_DAILY_LIMIT} emails a day through ${settings?.adminName || "the admin"}. Try again tomorrow, or copy the email and send it yourself.`
+        : /permission/i.test(String((e as { code?: string })?.code || e))
+          ? "That email couldn’t be queued. Use one email address in the To box, keep the message short, and check your email address is confirmed (Settings → Logged in)."
+          : "Couldn’t queue the email. Check your connection and try again.")
     } finally {
       setBusy(null)
     }
