@@ -43,6 +43,8 @@ While the app is in Testing, Google shows people a "Google hasn't verified this 
 2. In Firebase: **Firestore Database → Start collection**. Collection ID `admins`; Document ID = your User ID; add one field (`role`, string, `admin`) and save.
 3. Reload the site. You'll see the **Admin** tab. Set the name account holders see.
 
+Admin access only works when you log in with **Continue with Google**: the database rules check how you signed in. Logging in with a password gives an ordinary account. Turn on 2-Step Verification (ideally a passkey) for that Google account.
+
 ## 7. Invite people
 
 Send them the site link. They create an account (or use **Continue with Google**), then connect Gmail and Calendar from the **Account** tab. If they used the earlier claude.ai version, they can bring their data across with **Account → Your data → Restore from file** using a back-up from that version.

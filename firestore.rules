@@ -5,7 +5,13 @@ service cloud.firestore {
     function signedIn() { return request.auth != null; }
     function me(uid) { return signedIn() && request.auth.uid == uid; }
     // You make someone an admin by creating admins/<their user ID> in the Firebase console.
-    function isAdmin() { return signedIn() && exists(/databases/$(database)/documents/admins/$(request.auth.uid)); }
+    // Admin powers only count when that person logged in with Google this session, so a stolen
+    // KASA.Rx password alone gives an ordinary account, and Google's 2-Step Verification guards admin.
+    function isAdmin() {
+      return signedIn()
+        && request.auth.token.firebase.sign_in_provider == 'google.com'
+        && exists(/databases/$(database)/documents/admins/$(request.auth.uid));
+    }
     function str(v, max) { return v is string && v.size() <= max; }
     // One plain address: no spaces, commas, angle brackets or line breaks (so nothing can be added to an email's headers)
     function oneEmail(v) { return str(v, 254) && v.matches('^[^@\\s,;<>"]+@[^@\\s,;<>"]+[.][^@\\s,;<>"]+$'); }

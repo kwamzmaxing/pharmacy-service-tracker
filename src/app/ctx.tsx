@@ -44,6 +44,8 @@ export type AppApi = {
   connect: (area: GoogleArea) => Promise<boolean>
   disconnectGoogle: () => void
   isAdmin: boolean
+  /** This account is an admin, but logged in without Google, so admin is switched off for now. */
+  adminNeedsGoogle: boolean
   settings: PublicSettings | null
   setSettings: (s: PublicSettings | null) => void
   theme: ThemePref
