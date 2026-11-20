@@ -32,6 +32,20 @@ Use the same project in Google Cloud: <https://console.cloud.google.com> (choose
 
 While the app is in Testing, Google shows people a "Google hasn't verified this app" screen; they click **Continue**. To remove it and allow more than 100 people, choose **Publish app** and complete Google's verification (it asks for a privacy policy page and can take a few weeks).
 
+## 4b. Microsoft: log in, Outlook and Outlook Calendar (optional)
+
+One Microsoft app registration covers all three.
+
+1. Go to **entra.microsoft.com** → **App registrations** → **New registration**.
+   - Name: `KASA.Rx`
+   - Supported account types: **Accounts in any organizational directory and personal Microsoft accounts**
+   - Redirect URI: platform **Single-page application (SPA)**, `https://kwamzmaxing.github.io/pharmacy-service-tracker/auth-redirect.html`
+2. Copy the **Application (client) ID** into `microsoftClientId` in `src/config.ts`.
+3. **Authentication** → **Add a platform** → **Web**, redirect URI `https://service-tracker-invoice.firebaseapp.com/__/auth/handler`.
+4. **Certificates & secrets** → **New client secret** → copy the secret's **Value** (shown once).
+5. **API permissions** → **Add a permission** → **Microsoft Graph** → **Delegated**: `Mail.Send`, `Calendars.ReadWrite`, `User.Read`, `openid`, `email`, `profile`.
+6. In Firebase: **Authentication → Sign-in method → Add new provider → Microsoft**, paste the client ID and the secret value, **Save**. Then set `microsoftLogin = true` in `src/config.ts`.
+
 ## 5. Publish the site
 
 1. In this GitHub repository, open **Settings → Pages** and set **Source** to **GitHub Actions**.

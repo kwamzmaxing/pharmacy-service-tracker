@@ -52,6 +52,9 @@ export type Profile = {
   followUpRepeat: number
   /** Add each invoice's due date to the account holder's Google Calendar. */
   calendar: boolean
+  /** Which connected account sends email and holds payment dates, when both Google and Microsoft are connected. */
+  mailWith?: "google" | "microsoft"
+  calendarWith?: "google" | "microsoft"
   /** How invoice and follow-up emails go out by default. */
   sendVia: "mine" | "admin"
   /** Small image shown at the top of invoices (data URL). */
@@ -118,7 +121,7 @@ export type Invoice = {
   created: string
   /** When the invoice email was first sent or drafted. */
   sentAt?: string | null
-  sentVia?: "gmail" | "draft" | "admin" | "copied" | "email-app" | "marked"
+  sentVia?: "gmail" | "outlook" | "draft" | "admin" | "copied" | "email-app" | "marked"
   /** When a calendar reminder was added for the due date. */
   calendarAt?: string | null
 }

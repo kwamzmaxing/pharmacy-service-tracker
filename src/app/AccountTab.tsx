@@ -2,9 +2,9 @@ import { useRef, useState } from "react"
 import { toast } from "sonner"
 import * as XLSX from "xlsx"
 import {
-  deleteUser, EmailAuthProvider, GoogleAuthProvider, reauthenticateWithCredential, reauthenticateWithPopup, sendEmailVerification, updatePassword,
+  deleteUser, EmailAuthProvider, GoogleAuthProvider, OAuthProvider, reauthenticateWithCredential, reauthenticateWithPopup, sendEmailVerification, updatePassword,
 } from "firebase/auth"
-import { CalendarDays, Copy, LogOut, Mail, MessageSquare } from "lucide-react"
+import { Copy, LogOut, MessageSquare } from "lucide-react"
 import { Label } from "@/components/ui/label"
 import { Button } from "@/components/ui/button"
 import { Switch } from "@/components/ui/switch"
@@ -18,17 +18,54 @@ import { forgetPerson, wipeReceipts, wipeVault } from "@/lib/cloud"
 import { shrinkImage } from "@/lib/images"
 import { saveFile } from "@/lib/store"
 import type { ConnStatus } from "@/lib/google"
-import { CONTACT_EMAIL } from "./brand"
+import { CONTACT_EMAIL, GoogleLogo, MicrosoftLogo } from "./brand"
+import { NAMES, PROVIDERS, type Service } from "@/lib/accounts"
 import { useApp } from "./ctx"
 import { AreaField, Chips, Field, Panel, Pill } from "./bits"
 import type { ThemePref } from "@/lib/theme"
 
 const STATUS_LABEL = { paid: "Paid", unpaid: "Unpaid", overdue: "Overdue" }
 const connLabel = (s: ConnStatus) => ({ ready: "Connected", not_connected: "Not connected", unavailable: "Not set up" })[s]
+/** Google and Microsoft side by side for one service: connect, choose which to use, disconnect. */
+function Connections({ service }: { service: Service }) {
+  const { conn, connectTo, disconnectFrom, commit, mailWith, calendarWith } = useApp()
+  const using = service === "mail" ? mailWith : calendarWith
+  const key = service === "mail" ? "mailWith" : "calendarWith"
+  const shown = PROVIDERS.filter((p) => conn[p][service] !== "unavailable")
+  if (!shown.length) return null
+  return (
+    <div className="grid gap-2">
+      {shown.map((p) => {
+        const ready = conn[p][service] === "ready"
+        return (
+          <div key={p} className="flex flex-wrap items-center justify-between gap-3 rounded-xl bg-secondary/60 px-4 py-3">
+            <span className="flex min-w-0 items-center gap-3">
+              {p === "google" ? <GoogleLogo /> : <MicrosoftLogo />}
+              <span className="min-w-0">
+                <span className="block text-[14px] font-medium">{NAMES[p][service]}</span>
+                <span className="block text-[12px] text-muted-foreground">{!ready ? "Not connected" : using === p ? (service === "mail" ? "Connected · emails are sent from here" : "Connected · payment dates go here") : "Connected"}</span>
+              </span>
+            </span>
+            <span className="flex flex-wrap gap-1.5">
+              {ready && using !== p && <Button size="sm" variant="outline" onClick={() => commit((d) => void (d.profile[key] = p), `Now using ${NAMES[p][service]} ✓`)}>Use this</Button>}
+              {ready
+                ? <Button size="sm" variant="ghost" onClick={() => disconnectFrom(p)}>Disconnect</Button>
+                : <Button size="sm" onClick={() => connectTo(p, service)}>Connect</Button>}
+            </span>
+          </div>
+        )
+      })}
+      {shown.some((p) => conn[p][service] === "ready") && <p className="text-[12px] text-muted-foreground">Disconnecting {shown.length > 1 ? "an account" : "it"} also disconnects its {service === "mail" ? "calendar" : "email"} on this device.</p>}
+    </div>
+  )
+}
+
 const connTone = (s: ConnStatus) => (s === "ready" ? "done" : s === "unavailable" ? "pending" : "overdue") as "done" | "pending" | "overdue"
 
 export function AccountTab() {
-  const { data, commit, me, ask, replaceAll, logOut, accountDeleted, google, connect, disconnectGoogle, settings, isAdmin, openFeedback, go, theme, setTheme } = useApp()
+  const { data, commit, me, ask, replaceAll, logOut, accountDeleted, conn, mailWith, calendarWith, settings, isAdmin, openFeedback, go, theme, setTheme } = useApp()
+  const anyMail = conn.google.mail !== "unavailable" || conn.microsoft.mail !== "unavailable"
+  const anyCal = conn.google.calendar !== "unavailable" || conn.microsoft.calendar !== "unavailable"
   const p = data.profile
   const restoreRef = useRef<HTMLInputElement>(null)
   const combineRef = useRef<HTMLInputElement>(null)
@@ -172,6 +209,7 @@ export function AccountTab() {
         if (!/requires-recent-login/.test((x as { code?: string })?.code || "")) throw x
         // Firebase asks for a fresh log-in before deleting an account
         if (me.viaGoogle) await reauthenticateWithPopup(u, new GoogleAuthProvider())
+        else if (me.viaMicrosoft) await reauthenticateWithPopup(u, new OAuthProvider("microsoft.com"))
         else {
           const pw = window.prompt("To delete your account, enter your password once more:")
           if (!pw) return toast("Your data was deleted, but the account is still there. Try again to remove it.")
@@ -203,7 +241,7 @@ export function AccountTab() {
         <Chips<ThemePref> label="Appearance" value={theme} onChange={setTheme} options={[["dark", "Dark"], ["light", "Light"], ["system", "Match my device"]]} />
       </Panel>
 
-      <Panel title="Logged in" aside={me.viaGoogle ? "with Google" : me.emailVerified ? "email verified" : "email not verified yet"}>
+      <Panel title="Logged in" aside={me.viaGoogle ? "with Google" : me.viaMicrosoft ? "with Microsoft" : me.emailVerified ? "email verified" : "email not verified yet"}>
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="min-w-0">
             <div className="truncate text-[15px] font-semibold">{name}</div>
@@ -212,7 +250,7 @@ export function AccountTab() {
           <Button variant="outline" onClick={logOut}><LogOut /> Log out</Button>
         </div>
         <p className="mt-2 max-w-[62ch] text-[12.5px] text-muted-foreground">Log out to switch to a different account. Your tracker is saved online: log in on any phone or computer to see it.</p>
-        {!me.viaGoogle && !me.emailVerified && (
+        {!me.viaGoogle && !me.viaMicrosoft && !me.emailVerified && (
           <p className="mt-2 text-[12.5px] text-muted-foreground">Please confirm your email so password resets reach you. <button type="button" className="font-semibold text-brand-ink hover:underline" onClick={resendVerify}>Resend the confirmation email</button></p>
         )}
         <p className="mt-2 text-[12px] text-muted-foreground">
@@ -221,22 +259,19 @@ export function AccountTab() {
         </p>
       </Panel>
 
-      <Panel title="Email" aside={<Pill tone={connTone(google.gmail)}>{connLabel(google.gmail)}</Pill>}>
+      <Panel title="Email" aside={<Pill tone={connTone(mailWith ? "ready" : anyMail ? "not_connected" : "unavailable")}>{mailWith ? `Using ${NAMES[mailWith].mail}` : connLabel(anyMail ? "not_connected" : "unavailable")}</Pill>}>
         <div className="grid gap-4">
-          <div className="flex flex-wrap items-start justify-between gap-3">
-            <p className="max-w-[56ch] text-[13px] text-muted-foreground">
-              {google.gmail === "unavailable"
-                ? "Gmail sending isn’t set up on this site yet. You can still copy each email, or open it in your email app."
-                : "Connect your Gmail to send invoices and follow-ups straight from your own address, with the invoice attached. Google asks you to agree once."}
-            </p>
-            {google.gmail === "not_connected" && <Button onClick={() => connect("gmail")}><Mail /> Connect Gmail</Button>}
-            {google.gmail === "ready" && <Button variant="outline" onClick={disconnectGoogle}>Disconnect Google</Button>}
-          </div>
+          <p className="max-w-[60ch] text-[13px] text-muted-foreground">
+            {anyMail
+              ? "Connect Gmail or Outlook to send invoices and follow-ups straight from your own address, with the invoice attached. You agree once in Google’s or Microsoft’s window."
+              : "Sending from your own email isn’t set up on this site yet. You can still copy each email, or open it in your email app."}
+          </p>
+          <Connections service="mail" />
           {relay && (
             <div className="grid gap-1.5">
               <span className="text-[12.5px] font-normal text-muted-foreground">Send invoice and follow-up emails from</span>
               <div role="radiogroup" aria-label="Send emails from" className="grid gap-2 sm:grid-cols-2">
-                {([["mine", "My own Gmail", "Sent straight away, from your address."], ["admin", `${settings?.adminName || "The admin"}’s email`, "Queued and sent from their Gmail."]] as const).map(([v, t, d]) => (
+                {([["mine", "My own email", "Sent straight away, from your address."], ["admin", `${settings?.adminName || "The admin"}’s email`, "Queued and sent from their email."]] as const).map(([v, t, d]) => (
                   <button key={v} type="button" role="radio" aria-checked={p.sendVia === v} onClick={() => set("sendVia", v)}
                     className={`rounded-xl border px-3.5 py-2.5 text-left text-[13px] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${p.sendVia === v ? "border-primary bg-accent" : "bg-field"}`}>
                     <span className="block font-semibold">{t}</span>
@@ -254,15 +289,13 @@ export function AccountTab() {
         </div>
       </Panel>
 
-      <Panel title="Calendar" aside={<Pill tone={connTone(google.calendar)}>{connLabel(google.calendar)}</Pill>}>
+      <Panel title="Calendar" aside={<Pill tone={connTone(calendarWith ? "ready" : anyCal ? "not_connected" : "unavailable")}>{calendarWith ? `Using ${NAMES[calendarWith].calendar}` : connLabel(anyCal ? "not_connected" : "unavailable")}</Pill>}>
         <div className="grid gap-3">
-          <div className="flex flex-wrap items-start justify-between gap-3">
-            <p className="max-w-[56ch] text-[13px] text-muted-foreground">
-              Put each invoice’s expected payment date in your Google Calendar, so you know when money should arrive.
-              {google.calendar !== "ready" && " Without connecting, every invoice still has an “Add to Google Calendar” link."}
-            </p>
-            {google.calendar === "not_connected" && <Button onClick={() => connect("calendar")}><CalendarDays /> Connect Google Calendar</Button>}
-          </div>
+          <p className="max-w-[60ch] text-[13px] text-muted-foreground">
+            Put each invoice’s expected payment date in your calendar, so you know when money should arrive.
+            {!calendarWith && " Without connecting, every invoice still has “Add to Google Calendar” and “Outlook” links."}
+          </p>
+          <Connections service="calendar" />
           <div className="flex items-center justify-between gap-3">
             <label htmlFor="p-calendar" className="text-[13px]">Add the payment date automatically when I create an invoice</label>
             <Switch id="p-calendar" checked={!!p.calendar} onCheckedChange={(v) => set("calendar", v)} />
@@ -311,7 +344,7 @@ export function AccountTab() {
         </div>
       </Panel>
 
-      {!me.viaGoogle && (
+      {!me.viaGoogle && !me.viaMicrosoft && (
         <Panel title="Change password">
           <form onSubmit={changePw} className="grid gap-3">
             <input type="email" autoComplete="username" value={me.email} readOnly hidden />

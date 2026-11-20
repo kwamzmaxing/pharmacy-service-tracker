@@ -8,6 +8,9 @@ importers:
 
   .:
     dependencies:
+      '@azure/msal-browser':
+        specifier: 5.28.0
+        version: 5.28.0
       '@hookform/resolvers':
         specifier: ^7.0.7
         version: 7.0.7(ajv-formats@3.0.1(ajv@8.20.0))(ajv@8.20.0)(react-hook-form@7.92.0(@types/react@19.3.0)(react@19.3.1))(zod@4.6.7)
@@ -198,6 +201,14 @@ packages:
 
   '@apidevtools/json-schema-ref-parser@9.1.2':
     resolution: {integrity: sha512-r1w81DpR+KyRWd3f+rk6TNqMgedmAxZP5v5KWlXQWlgMUUtyEJch0DKEci1SorPMiSeM8XPl7MZ3miJ60JIpQg==}
+
+  '@azure/msal-browser@5.28.0':
+    resolution: {integrity: sha512-f3yY518Z++x3ZogCbcLK6vnABgpxc8rAKGKtQibcUJKAVU9gamgh5mNAPJIRwduzXQvO2xtHx/gtmPz8iuZ8+w==}
+    engines: {node: '>=0.8.0'}
+
+  '@azure/msal-common@16.16.0':
+    resolution: {integrity: sha512-EZgd8h5nczsdRAQAgXA0A0pC5L/zj43n1jePXvUMgdwXMbH2zhb7b7Hp+Oe7ZOODK/sch2x+soD6FOrtgUbx/w==}
+    engines: {node: '>=0.8.0'}
 
   '@babel/runtime@7.29.14':
     resolution: {integrity: sha512-Y5tqevQaUAZhhj82BpYMNC1ssvLQTVAfwKdm8iy8qwmhvC2/CpcAu8OC+QEtjM7pMk7knx83u1Qj8gzkicyelw==}
@@ -4652,6 +4663,12 @@ snapshots:
       '@types/json-schema': 7.0.15
       call-me-maybe: 1.0.2
       js-yaml: 4.3.2
+
+  '@azure/msal-browser@5.28.0':
+    dependencies:
+      '@azure/msal-common': 16.16.0
+
+  '@azure/msal-common@16.16.0': {}
 
   '@babel/runtime@7.29.14': {}
 

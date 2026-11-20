@@ -2,12 +2,13 @@ import { createContext, useContext } from "react"
 import type { Data } from "@/lib/model"
 import type { OutboxItem, PublicSettings } from "@/lib/cloud"
 import type { ConnStatus, GoogleArea } from "@/lib/google"
+import type { Conn, Provider, Service } from "@/lib/accounts"
 import type { ThemePref } from "@/lib/theme"
 
 export type Tab = "home" | "log" | "summary" | "invoices" | "expenses" | "tax" | "clients" | "services" | "account" | "admin"
 export type LogMode = "service" | "hours" | "journey"
 export type EmailKind = "invoice" | "followup"
-export type Me = { uid: string; email: string; name: string; emailVerified: boolean; viaGoogle: boolean }
+export type Me = { uid: string; email: string; name: string; emailVerified: boolean; viaGoogle: boolean; viaMicrosoft: boolean }
 
 export type AskOptions = {
   title: string
@@ -43,6 +44,13 @@ export type AppApi = {
   /** Connect a Google service (call from a click). Resolves true when connected. */
   connect: (area: GoogleArea) => Promise<boolean>
   disconnectGoogle: () => void
+  /** Gmail / Google Calendar and Outlook / Outlook Calendar connections on this device. */
+  conn: Conn
+  /** The account that sends email / adds calendar events, if any is connected. */
+  mailWith: Provider | null
+  calendarWith: Provider | null
+  connectTo: (p: Provider, s: Service) => Promise<boolean>
+  disconnectFrom: (p: Provider) => void
   isAdmin: boolean
   settings: PublicSettings | null
   setSettings: (s: PublicSettings | null) => void

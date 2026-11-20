@@ -15,6 +15,14 @@ export const firebaseConfig = {
 /** OAuth client ID used to connect each person's Gmail and Google Calendar. */
 export const googleClientId = "1006803367671-b7ipqvaf77a1pom9peodq1ubksunk9v6.apps.googleusercontent.com"
 
+/**
+ * Microsoft (Entra ID) app registration's "Application (client) ID", used to connect each
+ * person's Outlook and Outlook Calendar. Leave empty to hide the Microsoft options.
+ */
+export const microsoftClientId = ""
+/** Show "Continue with Microsoft" on the log-in screen (switch on once Microsoft is enabled in Firebase Authentication). */
+export const microsoftLogin = false || import.meta.env.VITE_USE_EMULATOR === "1"
+
 /** Where the site is published; used in emails. */
 export const siteUrl = "https://kwamzmaxing.github.io/pharmacy-service-tracker/"
 

@@ -14,7 +14,9 @@ import {
 import { saveFile } from "@/lib/store"
 import { invoicePdf, pdfBase64, pdfBlob } from "@/lib/pdf"
 import { queueEmail, sendFeedback } from "@/lib/cloud"
-import { addCalendarEvent, calendarLink, GOOGLE_HELP, GoogleError, sendMail } from "@/lib/google"
+import { calendarLink } from "@/lib/google"
+import { outlookCalendarLink } from "@/lib/microsoft"
+import { addEventWith, isCancel, NAMES, problem, sendWith } from "@/lib/accounts"
 import { useApp, type AskOptions, type EmailKind } from "./ctx"
 import { InvoiceDoc, invoiceFile } from "./invoice"
 import { Pill } from "./bits"
@@ -60,25 +62,22 @@ export function invoiceAttachment(inv: Invoice, logo?: string) {
 }
 const calDetails = (inv: Invoice) => `Expected payment for ${inv.number} from ${inv.to.name || "the pharmacy"}: ${money(inv.total)}. Logged in KASA.Rx.`
 const calTitle = (inv: Invoice) => `Payment due: ${inv.number} · ${money(inv.total)}`
-const googleMsg = (e: unknown) => {
-  const k = e instanceof GoogleError ? e.kind : "failed"
-  return GOOGLE_HELP[k] + (e instanceof Error && e.message && e.message !== k ? ` ${e.message}` : "")
-}
 
 export function InvoiceDialog({ id, justCreated, onClose }: { id: string | null; justCreated: boolean; onClose: () => void }) {
-  const { data, me, email, google, commit } = useApp()
+  const { data, me, email, calendarWith, commit } = useApp()
   const inv = id ? data.invoices.find((i) => i.id === id) : null
   const st = inv ? invStatus(inv) : "unpaid"
   const [calBusy, setCalBusy] = useState(false)
 
   async function addToCalendar() {
-    if (!inv) return
+    if (!inv || !calendarWith) return
     setCalBusy(true)
+    const name = NAMES[calendarWith].calendar
     try {
-      await addCalendarEvent({ title: calTitle(inv), date: inv.due, details: calDetails(inv) }, me.email)
-      commit((d) => void (d.invoices.find((x) => x.id === inv.id)!.calendarAt = new Date().toISOString()), `Added ${fmtDate(inv.due)} to your Google Calendar ✓`)
+      await addEventWith(calendarWith, { title: calTitle(inv), date: inv.due, details: calDetails(inv) }, me.email)
+      commit((d) => void (d.invoices.find((x) => x.id === inv.id)!.calendarAt = new Date().toISOString()), `Added ${fmtDate(inv.due)} to your ${name} ✓`)
     } catch (e) {
-      if (!(e instanceof GoogleError && e.kind === "cancelled")) toast.error("Couldn’t add it to Google Calendar. " + googleMsg(e))
+      if (!isCancel(e)) toast.error(`Couldn’t add it to ${name}. ` + problem(e))
     } finally {
       setCalBusy(false)
     }
@@ -122,12 +121,17 @@ export function InvoiceDialog({ id, justCreated, onClose }: { id: string | null;
             </div>
             <div className="flex flex-wrap items-center gap-2 text-[12.5px] text-muted-foreground">
               <CalendarDays className="size-4" />
-              {inv.calendarAt ? <>Payment date is in your Google Calendar.</> : <>Payment expected {fmtDate(inv.due)}.</>}
+              {inv.calendarAt ? <>Payment date is in your calendar.</> : <>Payment expected {fmtDate(inv.due)}.</>}
               {!inv.calendarAt && st !== "paid" && (
-                google.calendar === "ready" ? (
-                  <Button size="sm" variant="ghost" className="h-7 px-2 text-brand-ink" disabled={calBusy} onClick={addToCalendar}>{calBusy ? "Adding…" : "Add to Google Calendar"}</Button>
+                calendarWith ? (
+                  <Button size="sm" variant="ghost" className="h-7 px-2 text-brand-ink" disabled={calBusy} onClick={addToCalendar}>{calBusy ? "Adding…" : `Add to ${NAMES[calendarWith].calendar}`}</Button>
                 ) : (
-                  <a className="font-semibold text-brand-ink hover:underline" href={calendarLink(calTitle(inv), inv.due, calDetails(inv))} target="_blank" rel="noopener noreferrer">Add to Google Calendar ↗</a>
+                  <>
+                    Add to
+                    <a className="font-semibold text-brand-ink hover:underline" href={calendarLink(calTitle(inv), inv.due, calDetails(inv))} target="_blank" rel="noopener noreferrer">Google Calendar ↗</a>
+                    <span aria-hidden>·</span>
+                    <a className="font-semibold text-brand-ink hover:underline" href={outlookCalendarLink(calTitle(inv), inv.due, calDetails(inv))} target="_blank" rel="noopener noreferrer">Outlook ↗</a>
+                  </>
                 )
               )}
             </div>
@@ -160,7 +164,7 @@ async function copy(text: string, el?: HTMLTextAreaElement | HTMLInputElement | 
 }
 type Route = "send" | "admin" | "copy"
 export function EmailDialog({ req, onClose, onBack }: { req: { id: string; kind: EmailKind } | null; onClose: () => void; onBack?: () => void }) {
-  const { data, commit, me, google, connect, go, settings, isAdmin, refreshOutbox } = useApp()
+  const { data, commit, me, conn, mailWith, connectTo, go, settings, isAdmin, refreshOutbox } = useApp()
   const inv = req ? data.invoices.find((i) => i.id === req.id) : null
   const kind = req?.kind ?? "invoice"
   const [to, setTo] = useState("")
@@ -170,7 +174,7 @@ export function EmailDialog({ req, onClose, onBack }: { req: { id: string; kind:
   const [busy, setBusy] = useState<Route | null>(null)
   const [note, setNote] = useState("")
   const relay = !!settings?.relay && !isAdmin
-  const mine = google.gmail === "ready"
+  const mine = !!mailWith
   const preferred: Route = data.profile.sendVia === "admin" && relay ? "admin" : mine ? "send" : relay ? "admin" : "copy"
   useEffect(() => {
     if (!inv) return
@@ -203,11 +207,12 @@ export function EmailDialog({ req, onClose, onBack }: { req: { id: string; kind:
     setBusy("send")
     setNote("")
     try {
-      await sendMail({ to: to.trim(), subject, body, attachments: attach ? [invoiceAttachment(inv, data.profile.logo)] : undefined }, me.email)
-      record("gmail", `Sent to ${to.trim()} ✓`, true)
+      if (!mailWith) return
+      await sendWith(mailWith, { to: to.trim(), subject, body, attachments: attach ? [invoiceAttachment(inv, data.profile.logo)] : undefined }, me.email)
+      record(mailWith === "google" ? "gmail" : "outlook", `Sent from ${NAMES[mailWith].mail} to ${to.trim()} ✓`, true)
       onClose()
     } catch (e) {
-      if (!(e instanceof GoogleError && e.kind === "cancelled")) setNote("Gmail didn’t send it. " + googleMsg(e))
+      if (!isCancel(e)) setNote(`${mailWith ? NAMES[mailWith].mail : "Your email"} didn’t send it. ` + problem(e))
     } finally {
       setBusy(null)
     }
@@ -285,10 +290,11 @@ export function EmailDialog({ req, onClose, onBack }: { req: { id: string; kind:
                 </label>
               )}
             </div>
-            {!mine && google.gmail !== "unavailable" && (
+            {!mine && (conn.google.mail !== "unavailable" || conn.microsoft.mail !== "unavailable") && (
               <p className="flex flex-wrap items-center gap-2 rounded-xl bg-secondary px-3 py-2.5 text-[12.5px] text-muted-foreground">
-                Connect your Gmail to send straight from here.
-                <button type="button" className="font-semibold text-brand-ink underline-offset-2 hover:underline" onClick={() => connect("gmail")}>Connect Gmail</button>
+                Connect your email to send straight from here.
+                {conn.google.mail !== "unavailable" && <button type="button" className="font-semibold text-brand-ink underline-offset-2 hover:underline" onClick={() => connectTo("google", "mail")}>Connect Gmail</button>}
+                {conn.microsoft.mail !== "unavailable" && <button type="button" className="font-semibold text-brand-ink underline-offset-2 hover:underline" onClick={() => connectTo("microsoft", "mail")}>Connect Outlook</button>}
                 <span aria-hidden>·</span>
                 <button type="button" className="font-semibold text-brand-ink underline-offset-2 hover:underline" onClick={() => { onClose(); go("account") }}>Email settings</button>
               </p>
@@ -299,7 +305,7 @@ export function EmailDialog({ req, onClose, onBack }: { req: { id: string; kind:
               <Button variant="outline" onClick={openEmailApp}><Mail /> Email app</Button>
               <Button variant={v("copy")} onClick={copyMessage}><Copy /> Copy</Button>
               {relay && <Button variant={v("admin")} disabled={!!busy} onClick={viaAdmin}><Inbox /> {busy === "admin" ? "Queueing…" : `Send from ${settings?.adminName || "admin"}’s email`}</Button>}
-              {mine && <Button variant={v("send")} disabled={!!busy} onClick={sendNow}><Send /> {busy === "send" ? "Sending…" : "Send now"}</Button>}
+              {mine && <Button variant={v("send")} disabled={!!busy} onClick={sendNow}><Send /> {busy === "send" ? "Sending…" : `Send from ${NAMES[mailWith!].mail}`}</Button>}
             </DialogFooter>
           </>
         )}

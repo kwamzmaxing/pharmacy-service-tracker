@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button"
 import { ArrowLeft } from "lucide-react"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectSeparator, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { addCalendarEvent, hasToken } from "@/lib/google"
+import { addEventWith, canAddQuietly, NAMES } from "@/lib/accounts"
 import { draftInvoice, entryAmt, inRange, money, pendingFor, plural, qtyText, rangeLabel, unitOf, type Range, type RangeMode, type Unit } from "@/lib/model"
 import { useApp } from "./ctx"
 import { Callout, Chips, Empty, Field, Panel } from "./bits"
@@ -12,7 +12,7 @@ import { ClientForm, newClient } from "./ClientsTab"
 const NEW = "__new"
 
 export function SummaryTab() {
-  const { data, commit, ask, go, viewInvoice, me, google } = useApp()
+  const { data, commit, ask, go, viewInvoice, me, calendarWith } = useApp()
   const [range, setRange] = useState<Range>({ mode: "month", from: "", to: "" })
   const remembered = data.meta.lastClientId as string | undefined
   const [clientId, setClientId] = useState<string>(
@@ -58,10 +58,11 @@ export function SummaryTab() {
       for (const e of d.entries) if (ids.has(e.id)) Object.assign(e, { invoiced: true, invoiceId: inv.id, clientId: client.id })
     }, `Invoice ${inv.number} saved ✓`)
     viewInvoice(inv.id, true)
-    // Put the payment date in Google Calendar straight away when it's connected and Google already gave access this visit
-    if (p.calendar && google.calendar === "ready" && hasToken("calendar")) {
-      addCalendarEvent({ title: `Payment due: ${inv.number} · ${money(inv.total)}`, date: inv.due, details: `Expected payment for ${inv.number} from ${client.name}: ${money(inv.total)}.` }, me.email)
-        .then(() => commit((d) => void (d.invoices.find((x) => x.id === inv.id)!.calendarAt = new Date().toISOString()), `Added ${inv.due.split("-").reverse().join("/")} to your Google Calendar ✓`))
+    // Put the payment date in the connected calendar straight away, when that needs no sign-in window
+    if (p.calendar && calendarWith && canAddQuietly(calendarWith)) {
+      const cw = calendarWith
+      addEventWith(cw, { title: `Payment due: ${inv.number} · ${money(inv.total)}`, date: inv.due, details: `Expected payment for ${inv.number} from ${client.name}: ${money(inv.total)}.` }, me.email)
+        .then(() => commit((d) => void (d.invoices.find((x) => x.id === inv.id)!.calendarAt = new Date().toISOString()), `Added ${inv.due.split("-").reverse().join("/")} to your ${NAMES[cw].calendar} ✓`))
         .catch(() => {})
     }
   }

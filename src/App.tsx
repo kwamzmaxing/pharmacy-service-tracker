@@ -12,6 +12,8 @@ import { auth } from "@/lib/firebase"
 import { followUpsDue, initials, newData, type Data } from "@/lib/model"
 import { getSettings, isAdmin as checkAdmin, myOutbox, openVault, recordPerson, type OutboxItem, type PublicSettings, type SaveProblem, type Vault } from "@/lib/cloud"
 import { disconnect, GOOGLE_HELP, GoogleError, status as googleStatus, token as googleToken, type ConnStatus, type GoogleArea } from "@/lib/google"
+import { connStatus, NAMES, pick, problem, isCancel, type Conn, type Provider, type Service } from "@/lib/accounts"
+import { msConnect, msDisconnect, warmUp as warmUpMicrosoft } from "@/lib/microsoft"
 import { AppCtx, type AppApi, type AskOptions, type EmailKind, type LogMode, type Me, type Tab } from "@/app/ctx"
 import { ConfirmDialog, EmailDialog, FeedbackDialog, FollowUpDialog, InvoiceDialog } from "@/app/dialogs"
 import { AuthScreen } from "@/app/AuthScreen"
@@ -69,6 +71,7 @@ const meFrom = (u: User): Me => ({
   name: u.displayName || "",
   emailVerified: u.emailVerified,
   viaGoogle: u.providerData.some((p) => p.providerId === "google.com"),
+  viaMicrosoft: u.providerData.some((p) => p.providerId === "microsoft.com"),
 })
 
 export default function App() {
@@ -112,7 +115,9 @@ export default function App() {
     lastProblem.current = Date.now()
     toast.error(PROBLEM_TEXT[p])
   }, [])
-  const refreshGoogle = () => setGoogle({ gmail: googleStatus("gmail"), calendar: googleStatus("calendar"), sheets: googleStatus("sheets") })
+  const [conn, setConn] = useState<Conn>(connStatus)
+  const refreshGoogle = () => { setGoogle({ gmail: googleStatus("gmail"), calendar: googleStatus("calendar"), sheets: googleStatus("sheets") }); setConn(connStatus()) }
+  useEffect(() => { warmUpMicrosoft() }, [])
 
   const openUser = useCallback(async (u: User) => {
     setPhase("loading")
@@ -214,6 +219,7 @@ export default function App() {
   const leave = useCallback(async (notice: string) => {
     setInvoiceView(null); setEmailReq(null); setFollowOpen(false); setFeedbackOpen(false); setOutbox([])
     disconnect()
+    await msDisconnect()
     refreshGoogle()
     setAuthNotice(notice)
     await signOut(auth).catch(() => {})
@@ -231,9 +237,39 @@ export default function App() {
     }
   }, [me])
 
+  const connectTo = useCallback(async (p: Provider, s: Service) => {
+    try {
+      if (p === "google") await googleToken(s === "mail" ? "gmail" : "calendar", me?.email)
+      else await msConnect(s, me?.email)
+      refreshGoogle()
+      // Use the account just connected from now on
+      if (dataRef.current && vaultRef.current) {
+        const next = structuredClone(dataRef.current)
+        next.profile[s === "mail" ? "mailWith" : "calendarWith"] = p
+        dataRef.current = next
+        setData(next)
+        vaultRef.current.save(next)
+      }
+      toast.success(`${NAMES[p][s]} connected ✓`)
+      return true
+    } catch (e) {
+      if (!isCancel(e)) toast.error(problem(e))
+      refreshGoogle()
+      return false
+    }
+  }, [me])
+  const disconnectFrom = useCallback((p: Provider) => {
+    if (p === "google") disconnect()
+    else msDisconnect()
+    setTimeout(refreshGoogle, 0)
+    toast(`${NAMES[p].company} disconnected on this device`)
+  }, [])
+
   const api = useMemo<AppApi | null>(() => {
     if (!data || !me) return null
     return {
+      conn, connectTo, disconnectFrom,
+      mailWith: pick(conn, "mail", data.profile.mailWith), calendarWith: pick(conn, "calendar", data.profile.calendarWith),
       data, me, commit, replaceAll, ask, go, google, connect, isAdmin: admin, settings, setSettings, outbox, refreshOutbox, theme, setTheme, logMode,
       disconnectGoogle: () => { disconnect(); refreshGoogle(); toast("Google disconnected on this device") },
       viewInvoice: (id, justCreated = false) => setInvoiceView({ id, justCreated }),
@@ -245,7 +281,7 @@ export default function App() {
       logOut: () => leave("You’ve logged out."),
       accountDeleted: () => leave("Your account was deleted."),
     }
-  }, [data, me, commit, replaceAll, ask, go, google, connect, admin, settings, outbox, refreshOutbox, leave, clientView, theme, setTheme, logMode])
+  }, [data, me, commit, replaceAll, ask, go, google, connect, admin, settings, outbox, refreshOutbox, leave, clientView, theme, setTheme, logMode, conn, connectTo, disconnectFrom])
 
   const confirm = <ConfirmDialog req={askReq} onDone={(ok) => { askResolve.current?.(ok); askResolve.current = null; setAskReq(null) }} />
   const toaster = <Toaster theme={resolvedTheme} position="bottom-center" toastOptions={{ style: { fontFamily: "Inter, system-ui, sans-serif", borderRadius: 14 } }} />

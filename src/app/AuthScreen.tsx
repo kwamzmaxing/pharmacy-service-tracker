@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react"
 import {
-  browserLocalPersistence, browserSessionPersistence, createUserWithEmailAndPassword, GoogleAuthProvider,
+  browserLocalPersistence, browserSessionPersistence, createUserWithEmailAndPassword, GoogleAuthProvider, OAuthProvider,
   sendEmailVerification, sendPasswordResetEmail, setPersistence, signInWithEmailAndPassword, signInWithPopup, updateProfile,
 } from "firebase/auth"
 import { Button } from "@/components/ui/button"
@@ -8,7 +8,8 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { cn } from "@/lib/utils"
 import { auth } from "@/lib/firebase"
 import { Field } from "./bits"
-import { Wordmark } from "./brand"
+import { GoogleLogo, MicrosoftLogo, Wordmark } from "./brand"
+import { microsoftLogin } from "@/config"
 
 const validEmail = (e: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e.trim())
 function message(code: string) {
@@ -16,8 +17,9 @@ function message(code: string) {
   if (/invalid-credential|wrong-password|user-not-found|invalid-login/.test(code)) return "That email and password don’t match. Try again, or reset your password."
   if (/too-many-requests/.test(code)) return "Too many tries. Wait a few minutes, or reset your password."
   if (/weak-password/.test(code)) return "Choose a stronger password: at least 8 characters."
-  if (/popup-closed|cancelled-popup/.test(code)) return "The Google window was closed before finishing."
-  if (/popup-blocked/.test(code)) return "Your browser blocked the Google window. Allow pop-ups for this site and try again."
+  if (/account-exists-with-different-credential/.test(code)) return "There’s already an account with that email, made another way. Log in with Google or your password instead."
+  if (/popup-closed|cancelled-popup/.test(code)) return "The sign-in window was closed before finishing."
+  if (/popup-blocked/.test(code)) return "Your browser blocked the sign-in window. Allow pop-ups for this site and try again."
   if (/network/.test(code)) return "The tracker can’t be reached right now. Check your connection and try again."
   if (/operation-not-allowed/.test(code)) return "This way of logging in isn’t switched on for the site yet."
   if (/configuration-not-found/.test(code)) return "Logins aren’t switched on for this site yet. The site owner needs to enable Authentication in Firebase."
@@ -82,12 +84,14 @@ export function AuthScreen({ notice }: { notice?: string }) {
       setBusy(false)
     }
   }
-  async function google() {
+  async function withProvider(which: "google" | "microsoft") {
     setErr("")
     setBusy(true)
     try {
       await remember()
-      await signInWithPopup(auth, new GoogleAuthProvider())
+      const provider = which === "google" ? new GoogleAuthProvider() : new OAuthProvider("microsoft.com")
+      if (provider instanceof OAuthProvider) provider.setCustomParameters({ prompt: "select_account" })
+      await signInWithPopup(auth, provider)
     } catch (x) {
       setErr(message((x as { code?: string })?.code || ""))
     } finally {
@@ -127,10 +131,16 @@ export function AuthScreen({ notice }: { notice?: string }) {
 
           {mode !== "forgot" && (
             <>
-              <Button type="button" variant="outline" className="h-11 w-full gap-2.5 text-[14.5px]" disabled={busy} onClick={google}>
-                <svg viewBox="0 0 48 48" className="size-5" aria-hidden><path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3C33.7 32.7 29.2 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3 0 5.8 1.1 7.9 3l5.7-5.7C34.1 6.1 29.3 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.3-.1-2.4-.4-3.5z"/><path fill="#FF3D00" d="m6.3 14.7 6.6 4.8C14.7 15.1 19 12 24 12c3 0 5.8 1.1 7.9 3l5.7-5.7C34.1 6.1 29.3 4 24 4 16.3 4 9.7 8.3 6.3 14.7z"/><path fill="#4CAF50" d="M24 44c5.2 0 9.9-2 13.4-5.2l-6.2-5.2C29.2 35.1 26.7 36 24 36c-5.2 0-9.6-3.3-11.3-8l-6.5 5C9.5 39.6 16.2 44 24 44z"/><path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.2-2.2 4.2-4.1 5.6l6.2 5.2C37 39.2 44 34 44 24c0-1.3-.1-2.4-.4-3.5z"/></svg>
+              <Button type="button" variant="outline" className="h-11 w-full gap-2.5 text-[14.5px]" disabled={busy} onClick={() => withProvider("google")}>
+                <GoogleLogo />
                 Continue with Google
               </Button>
+              {microsoftLogin && (
+                <Button type="button" variant="outline" className="mt-2 h-11 w-full gap-2.5 text-[14.5px]" disabled={busy} onClick={() => withProvider("microsoft")}>
+                  <MicrosoftLogo className="size-[18px]" />
+                  Continue with Microsoft
+                </Button>
+              )}
               <div className="my-4 flex items-center gap-3 text-[12px] text-muted-foreground"><span className="h-px flex-1 bg-border" />or with email<span className="h-px flex-1 bg-border" /></div>
             </>
           )}

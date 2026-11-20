@@ -4,6 +4,7 @@ import { ArrowRight, Calculator, Car, Clock, FileText, Pill as PillIcon, Plus, R
 import { cn } from "@/lib/utils"
 import { entryAmt, fmtDate, followUpsDue, invStatus, money, monthly, plural, qtyText, taxSummary, unitOf } from "@/lib/model"
 import { useApp, type Tab } from "./ctx"
+import { NAMES } from "@/lib/accounts"
 import { Ledger, Panel } from "./bits"
 
 function greeting() {
@@ -26,7 +27,7 @@ function Action({ icon, label, sub, onClick }: { icon: ReactNode; label: string;
 }
 
 export function HomeTab() {
-  const { data, me, go, google, showFollowUps } = useApp()
+  const { data, me, go, mailWith, showFollowUps } = useApp()
   const p = data.profile
   const first = (p.fullName || me.name || "").trim().split(/\s+/)[0]
   const months = monthly(data, 1)
@@ -57,7 +58,7 @@ export function HomeTab() {
     { tab: "expenses", icon: <Receipt />, title: "Expenses", text: "Costs and receipt photos, ready for your tax return.", stat: `${money(tax.expenses)} in ${tax.year.label}` },
     { tab: "tax", icon: <Calculator />, title: "Tax", text: "Income tax and National Insurance, estimated as you go.", stat: `About ${money(tax.total)} so far` },
     { tab: "clients", icon: <Store />, title: "Pharmacies", text: "Saved details and how quickly each one pays.", stat: plural(data.clients.length, "pharmacy", "pharmacies") + " saved" },
-    { tab: "account", icon: <Settings />, title: "Settings", text: "Invoice details, Gmail, calendar, appearance.", stat: google.gmail === "ready" ? "Gmail connected" : "Gmail not connected" },
+    { tab: "account", icon: <Settings />, title: "Settings", text: "Invoice details, email, calendar, appearance.", stat: mailWith ? `${NAMES[mailWith].mail} connected` : "Email not connected" },
   ]
 
   return (
