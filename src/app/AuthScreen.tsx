@@ -8,6 +8,7 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { cn } from "@/lib/utils"
 import { auth } from "@/lib/firebase"
 import { Field } from "./bits"
+import { Wordmark } from "./brand"
 
 const validEmail = (e: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e.trim())
 function message(code: string) {
@@ -99,10 +100,7 @@ export function AuthScreen({ notice }: { notice?: string }) {
     <div className="min-h-screen bg-background">
       <div className="wrap grid min-h-screen max-w-[1080px] content-center gap-10 py-12 md:grid-cols-[1fr_420px] md:items-center md:gap-16">
         <div>
-          <div className="flex items-center gap-3">
-            <div aria-hidden className="flex size-10 items-center justify-center rounded-lg bg-secondary font-display text-[22px] font-medium">℞</div>
-            <span className="font-display text-[17px] font-medium">Service Tracker</span>
-          </div>
+          <Wordmark tagline />
           <h1 className="mt-10 max-w-[14ch] font-display text-[clamp(32px,6vw,52px)] font-medium leading-[1.1]">Locum work, invoiced and paid.</h1>
           <p className="mt-5 max-w-md text-[16px] leading-relaxed text-muted-foreground">
             Log shifts, services and mileage as you go. Turn them into invoices in one tap, follow up when payments are late, and see what you owe in tax.

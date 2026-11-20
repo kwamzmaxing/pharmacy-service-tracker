@@ -1,4 +1,6 @@
-# Pharmacy Service Tracker
+# KASA.Rx
+
+The pharmacy service tracker run by KASA.
 
 Log pharmacy services and hours, turn them into invoices, email them from your own Gmail, put payment dates in Google Calendar, and follow up on late payments. Works on any phone or computer.
 

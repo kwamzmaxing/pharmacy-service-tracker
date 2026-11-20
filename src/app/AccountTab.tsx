@@ -18,6 +18,7 @@ import { forgetPerson, wipeReceipts, wipeVault } from "@/lib/cloud"
 import { shrinkImage } from "@/lib/images"
 import { saveFile } from "@/lib/store"
 import type { ConnStatus } from "@/lib/google"
+import { CONTACT_EMAIL } from "./brand"
 import { useApp } from "./ctx"
 import { AreaField, Chips, Field, Panel, Pill } from "./bits"
 import type { ThemePref } from "@/lib/theme"
@@ -340,7 +341,7 @@ export function AccountTab() {
 
       <Panel title="Feedback">
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <p className="max-w-[56ch] text-[13px] text-muted-foreground">Tell {settings?.adminName || "the person who runs this tracker"} what’s working, what isn’t, or what you’d like added.</p>
+          <p className="max-w-[56ch] text-[13px] text-muted-foreground">Tell {settings?.adminName || "KASA"} what’s working, what isn’t, or what you’d like added. You can also email <a href={`mailto:${CONTACT_EMAIL}`} className="font-medium text-brand-ink hover:underline">{CONTACT_EMAIL}</a>.</p>
           <Button variant="outline" onClick={openFeedback}><MessageSquare /> Send feedback</Button>
         </div>
       </Panel>

@@ -58,7 +58,7 @@ export function ConfirmDialog({ req: live, onDone }: { req: AskOptions | null; o
 export function invoiceAttachment(inv: Invoice, logo?: string) {
   return { filename: `${inv.number}.pdf`, mimeType: "application/pdf", content: pdfBase64(invoicePdf(inv, logo)) }
 }
-const calDetails = (inv: Invoice) => `Expected payment for ${inv.number} from ${inv.to.name || "the pharmacy"}: ${money(inv.total)}. Logged in Service Tracker.`
+const calDetails = (inv: Invoice) => `Expected payment for ${inv.number} from ${inv.to.name || "the pharmacy"}: ${money(inv.total)}. Logged in KASA.Rx.`
 const calTitle = (inv: Invoice) => `Payment due: ${inv.number} · ${money(inv.total)}`
 const googleMsg = (e: unknown) => {
   const k = e instanceof GoogleError ? e.kind : "failed"

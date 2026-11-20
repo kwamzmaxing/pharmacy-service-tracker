@@ -13,7 +13,7 @@ About 20 minutes, all free. You need a Google account. Do the steps in order.
 1. **Build → Authentication → Get started**.
 2. Under **Sign-in method**, enable **Email/Password**, then **Google** (pick your email as the support email).
 3. Under **Settings → Authorized domains**, add `kwamzmaxing.github.io`.
-4. Under **Templates → Password reset**, set the sender name (for example "Service Tracker") and put your own email as the **Reply-to** address, so replies to reset emails reach you.
+4. Under **Templates → Password reset**, set the sender name (for example "KASA.Rx") and put your own email as the **Reply-to** address, so replies to reset emails reach you.
 
 ## 3. Create the database
 
@@ -25,7 +25,7 @@ About 20 minutes, all free. You need a Google account. Do the steps in order.
 Use the same project in Google Cloud: <https://console.cloud.google.com> (choose your Firebase project at the top).
 
 1. **APIs & Services → Library**: enable **Gmail API**, **Google Calendar API** and **Google Sheets API**.
-2. **Google Auth Platform → Branding** (or **OAuth consent screen**): app name "Service Tracker", your email as support and developer contact, and the site address `https://kwamzmaxing.github.io/pharmacy-service-tracker/` as the home page.
+2. **Google Auth Platform → Branding** (or **OAuth consent screen**): app name "KASA.Rx", your email as support and developer contact, and the site address `https://kwamzmaxing.github.io/pharmacy-service-tracker/` as the home page.
 3. **Data access → Add or remove scopes**: add `.../auth/gmail.send`, `.../auth/calendar.events` and `.../auth/drive.file`.
 4. **Audience**: leave it in **Testing** for now and add the Gmail addresses of the people who will use it as **Test users** (up to 100).
 5. **Clients → Create client → Web application**. Under **Authorized JavaScript origins** add `https://kwamzmaxing.github.io`. Copy the **Client ID** into `googleClientId` in `src/config.ts`.

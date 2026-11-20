@@ -15,6 +15,7 @@ import { disconnect, GOOGLE_HELP, GoogleError, status as googleStatus, token as 
 import { AppCtx, type AppApi, type AskOptions, type EmailKind, type LogMode, type Me, type Tab } from "@/app/ctx"
 import { ConfirmDialog, EmailDialog, FeedbackDialog, FollowUpDialog, InvoiceDialog } from "@/app/dialogs"
 import { AuthScreen } from "@/app/AuthScreen"
+import { BRAND, CONTACT_EMAIL, PRIVACY_URL, TAGLINE, Wordmark } from "@/app/brand"
 import { LogTab } from "@/app/LogTab"
 import { HomeTab } from "@/app/HomeTab"
 import { SummaryTab } from "@/app/SummaryTab"
@@ -35,21 +36,11 @@ const PROBLEM_TEXT: Record<SaveProblem, string> = {
   failed: "Couldn’t save. Try again.",
 }
 
-/** The ℞ mark: ivory on graphite, quiet like the rest of the interface. */
-export function Mark({ size = "md" }: { size?: "md" | "lg" }) {
-  return (
-    <div aria-hidden className={cn("flex flex-none items-center justify-center rounded-lg bg-secondary font-display font-medium text-foreground", size === "lg" ? "size-11 text-[24px]" : "size-9 text-[20px]")}>℞</div>
-  )
-}
-
 function Splash({ message, children }: { message: string; children?: React.ReactNode }) {
   return (
     <div className="min-h-screen bg-background">
       <div className="wrap flex min-h-screen flex-col justify-center gap-5 py-10">
-        <div className="flex items-center gap-3">
-          <Mark size="lg" />
-          <h1 className="font-display text-[20px] font-medium">Service Tracker</h1>
-        </div>
+        <Wordmark size="lg" tagline as="h1" />
         <p className="max-w-md text-[15px] text-muted-foreground">{message}</p>
         {children}
       </div>
@@ -57,17 +48,16 @@ function Splash({ message, children }: { message: string; children?: React.React
   )
 }
 
-export const PRIVACY_URL = `${import.meta.env.BASE_URL}privacy.html`
-
 function SiteFooter({ onFeedback, onHome }: { onFeedback: () => void; onHome: () => void }) {
   const link = "rounded hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
   return (
     <footer className="wrap mt-14 flex flex-wrap items-center justify-between gap-x-6 gap-y-2 border-t border-border/60 pt-6 text-[12.5px] text-muted-foreground">
-      <span>Service Tracker · for UK locum pharmacists</span>
+      <span>{BRAND} · {TAGLINE}</span>
       <nav aria-label="Site" className="flex flex-wrap gap-x-5 gap-y-1">
         <button type="button" className={link} onClick={onHome}>Home</button>
         <a className={link} href={PRIVACY_URL} target="_blank" rel="noopener">Privacy policy</a>
         <button type="button" className={link} onClick={onFeedback}>Send feedback</button>
+        <a className={link} href={`mailto:${CONTACT_EMAIL}`}>Contact</a>
       </nav>
     </footer>
   )
@@ -277,9 +267,8 @@ export default function App() {
         <header className="sticky top-[env(safe-area-inset-top,0px)] z-40 bg-background/90 backdrop-blur-md supports-[backdrop-filter]:bg-background/75">
           <div className="wrap">
             <div className="flex items-center justify-between gap-3 pb-3 pt-4">
-              <button type="button" onClick={() => go("home")} aria-label="Service Tracker home" className="flex min-w-0 items-center gap-3 rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
-                <Mark />
-                <h1 className="font-display text-[17px] font-medium">Service Tracker</h1>
+              <button type="button" onClick={() => go("home")} aria-label={`${BRAND} home`} className="flex min-w-0 items-center gap-3 rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                <Wordmark tagline as="h1" />
               </button>
               <DropdownMenu>
                 <DropdownMenuTrigger aria-label="Account menu" className="flex min-w-0 items-center gap-2 rounded-full py-1 pl-3.5 pr-1 text-[13.5px] text-muted-foreground hover:bg-secondary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">

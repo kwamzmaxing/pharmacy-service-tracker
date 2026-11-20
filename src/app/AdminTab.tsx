@@ -92,7 +92,7 @@ export function AdminTab() {
     setBusy("sheet")
     try {
       const [p, f, o] = await Promise.all([listPeople(), listFeedback(), listOutbox()])
-      const r = await writeSheet(settings?.sheetId, "Service Tracker — account holders & feedback", [
+      const r = await writeSheet(settings?.sheetId, "KASA.Rx — account holders & feedback", [
         { title: "Account holders", rows: [["Name", "Email", "Created", "Last log-in"], ...p.map((x) => [x.name || "", x.email || "", x.created?.slice(0, 10) || "", x.lastLogin?.slice(0, 10) || ""])] },
         { title: "Feedback", rows: [["Date", "Name", "Email", "Topic", "Rating", "Message"], ...f.map((x) => [x.at.slice(0, 10), x.name, x.email, x.topic, x.rating || "", x.message])] },
         { title: "Emails sent for others", rows: [["Date", "From", "Email", "What", "Status", "Note"], ...o.map((x) => [x.at.slice(0, 10), x.name, x.email, label(x), x.status, x.error || ""])] },
