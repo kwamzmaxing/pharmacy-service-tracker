@@ -219,3 +219,52 @@ export const GOOGLE_HELP: Record<GoogleError["kind"], string> = {
   denied: "Google access wasn’t allowed.",
   failed: "Google reported a problem.",
 }
+
+/* ---------- Calendar: booked shifts ---------- */
+const EVENTS = "https://www.googleapis.com/calendar/v3/calendars/primary/events"
+const localZone = () => { try { return Intl.DateTimeFormat().resolvedOptions().timeZone || "Europe/London" } catch { return "Europe/London" } }
+const localStamp = (t: Date) =>
+  `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, "0")}-${String(t.getDate()).padStart(2, "0")}T${String(t.getHours()).padStart(2, "0")}:${String(t.getMinutes()).padStart(2, "0")}:00`
+export type ShiftEvent = { shiftId: string; title: string; details: string; location: string; start: Date; end: Date }
+/** Add the shift to Google Calendar, or update the event it already has. Returns the event id. */
+export async function putShiftEvent(ev: ShiftEvent, existingId?: string, hint?: string): Promise<string> {
+  const zone = localZone()
+  const body = {
+    summary: ev.title, description: ev.details, location: ev.location || undefined,
+    start: { dateTime: localStamp(ev.start), timeZone: zone }, end: { dateTime: localStamp(ev.end), timeZone: zone },
+    extendedProperties: { private: { kasaShift: ev.shiftId } },
+  }
+  if (existingId) {
+    try {
+      const r = await api("calendar", `${EVENTS}/${encodeURIComponent(existingId)}`, { method: "PATCH", json: body }, hint)
+      return (r as { id: string }).id
+    } catch (e) {
+      // Deleted in Google meanwhile: make it again
+      if (!(e instanceof GoogleError) || !/not found|deleted/i.test(e.message)) throw e
+    }
+  }
+  const r = await api("calendar", EVENTS, { method: "POST", json: body }, hint)
+  return (r as { id: string }).id
+}
+export async function deleteShiftEvent(id: string, hint?: string) {
+  try { await api("calendar", `${EVENTS}/${encodeURIComponent(id)}`, { method: "DELETE" }, hint) }
+  catch (e) { if (!(e instanceof GoogleError) || !/not found|deleted|gone/i.test(e.message)) throw e }
+}
+export type GoogleEvent = { id: string; title: string; date: string; start: string; end: string; allDay: boolean; endDate: string }
+/** The person's own events between two dates (not the ones this app added), for showing next to shifts. */
+export async function listEvents(from: string, to: string, hint?: string): Promise<GoogleEvent[]> {
+  const q = new URLSearchParams({ timeMin: new Date(from + "T00:00:00").toISOString(), timeMax: new Date(to + "T23:59:59").toISOString(), singleEvents: "true", orderBy: "startTime", maxResults: "250" })
+  const r = (await api("calendar", `${EVENTS}?${q}`, { method: "GET" }, hint)) as { items?: any[] }
+  const hhmm = (iso: string) => localStamp(new Date(iso)).slice(11, 16)
+  const day = (iso: string) => localStamp(new Date(iso)).slice(0, 10)
+  return (r.items || [])
+    .filter((e) => e.status !== "cancelled" && !e.extendedProperties?.private?.kasaShift)
+    .map((e) => {
+      const allDay = !!e.start?.date
+      return {
+        id: e.id, title: e.summary || "(No title)", allDay,
+        date: allDay ? e.start.date : day(e.start.dateTime), endDate: allDay ? e.end.date : day(e.end.dateTime),
+        start: allDay ? "" : hhmm(e.start.dateTime), end: allDay ? "" : hhmm(e.end.dateTime),
+      }
+    })
+}

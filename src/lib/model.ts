@@ -160,7 +160,43 @@ function normBudget(raw: any): Budget {
   return b
 }
 
+/* ---------- shifts (booked work, before it's logged) ---------- */
+export type Shift = {
+  id: string
+  date: string // YYYY-MM-DD the shift starts
+  start: string // HH:MM
+  end: string // HH:MM (earlier than start means it ends the next day)
+  /** Unpaid break, in minutes. */
+  breakMins: number
+  clientId?: string
+  /** Where, when it isn't a saved pharmacy. */
+  place?: string
+  pay: "hourly" | "fixed"
+  /** £ per hour, or £ for the whole shift. */
+  rate: number
+  notes: string
+  /** The log entry made from this shift once it was worked. */
+  entryId?: string
+  /** The matching Google Calendar event, and the shift as it was when last sent there. */
+  gcalId?: string
+  gcalSent?: string
+  created: string
+}
+export type ShiftCal = {
+  /** Put shifts in Google Calendar automatically while connected. */
+  sync: boolean
+  /** Google events still to delete (their shift was deleted while not connected). */
+  deletes: string[]
+}
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function normShiftCal(raw: any): ShiftCal {
+  const c = raw && typeof raw === "object" ? raw : {}
+  return { sync: c.sync !== false, deletes: Array.isArray(c.deletes) ? c.deletes : [] }
+}
+
 export type Data = {
+  shifts: Shift[]
+  shiftCal: ShiftCal
   budget: Budget
   services: Service[]
   clients: Client[]
@@ -243,7 +279,7 @@ export function newData(name = ""): Data {
   const profile = defaultProfile()
   profile.fullName = name
   profile.accountName = name
-  return { budget: defaultBudget(), services: STD_SERVICES(), clients: [], journeys: [], expenses: [], entries: [], invoices: [], profile, meta: { ratesV: "d1", mileage: 1, clients: 1 } }
+  return { shifts: [], shiftCal: normShiftCal(null), budget: defaultBudget(), services: STD_SERVICES(), clients: [], journeys: [], expenses: [], entries: [], invoices: [], profile, meta: { ratesV: "d1", mileage: 1, clients: 1 } }
 }
 /** Fill in anything missing, so old back-ups and older saved data still load. */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -279,6 +315,8 @@ export function normalize(raw: any): Data {
     meta.clients = 1
   }
   return {
+    shifts: Array.isArray(d.shifts) ? d.shifts : [],
+    shiftCal: normShiftCal(d.shiftCal),
     budget: normBudget(d.budget),
     services,
     clients,
@@ -463,6 +501,8 @@ export function buildDocs(d: Data): DocMap {
   if (d.journeys.length) docs.journeys = { journeys: d.journeys }
   // The budget (pots and other income) has its own document too
   docs.budget = { budget: d.budget }
+  // Booked shifts too
+  docs.shifts = { shifts: d.shifts, cal: d.shiftCal }
   const monthKey = (date: string) => "m-" + (/^\d{4}-\d{2}/.test(date || "") ? date.slice(0, 7) : "other")
   for (const e of d.entries) ((docs[monthKey(e.date)] ??= { entries: [] }).entries as Entry[]).push(e)
   for (const x of d.expenses) {
@@ -475,7 +515,7 @@ export function buildDocs(d: Data): DocMap {
 export function assembleDocs(docs: DocMap): Data | null {
   const core = docs.core
   if (!core) return null
-  const d = { services: core.services, clients: core.clients, profile: core.profile, meta: core.meta || {}, journeys: (docs.journeys?.journeys as Journey[]) || [], budget: docs.budget?.budget as Budget | undefined, entries: [] as Entry[], expenses: [] as Expense[], invoices: [] as Invoice[] }
+  const d = { services: core.services, clients: core.clients, profile: core.profile, meta: core.meta || {}, journeys: (docs.journeys?.journeys as Journey[]) || [], budget: docs.budget?.budget as Budget | undefined, shifts: (docs.shifts?.shifts as Shift[]) || [], shiftCal: docs.shifts?.cal, entries: [] as Entry[], expenses: [] as Expense[], invoices: [] as Invoice[] }
   for (const k of Object.keys(docs).sort()) {
     if (k.startsWith("m-")) {
       d.entries.push(...((docs[k].entries as Entry[]) || []))
