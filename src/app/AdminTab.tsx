@@ -117,6 +117,9 @@ export function AdminTab() {
 
   return (
     <div className="grid gap-5 sm:gap-6">
+      <p className="rounded-xl bg-secondary/60 px-4 py-3 text-[12.5px] text-muted-foreground">
+        Admin only works when you log in with Google, so your Google 2-Step Verification protects it. Logging in with a password gives an ordinary account.
+      </p>
       <div className="grid grid-cols-3 gap-2.5">
         {([["Account holders", people.length], ["Waiting to send", waiting.length], ["Feedback", feedback.length]] as const).map(([k, v]) => (
           <div key={k} className={cn("min-w-0 rounded-2xl border bg-card px-3.5 py-3", k === "Waiting to send" && v > 0 && "border-destructive/40 bg-danger-tint")}>

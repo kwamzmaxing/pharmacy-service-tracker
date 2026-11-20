@@ -133,6 +133,7 @@ export default function App() {
   const [clientView, setClientView] = useState<string | null>(null)
   const [google, setGoogle] = useState<Record<GoogleArea, ConnStatus>>({ gmail: googleStatus("gmail"), calendar: googleStatus("calendar"), sheets: googleStatus("sheets") })
   const [admin, setAdmin] = useState(false)
+  const [adminNeedsGoogle, setAdminNeedsGoogle] = useState(false)
   const [settings, setSettings] = useState<PublicSettings | null>(null)
   const [outbox, setOutbox] = useState<OutboxItem[]>([])
   const [askReq, setAskReq] = useState<AskOptions | null>(null)
@@ -186,7 +187,11 @@ export default function App() {
       dataRef.current = next
       setData(next)
     })
-    checkAdmin(u.uid).then(setAdmin)
+    // Admin only counts after logging in with Google (the database rules check the same thing)
+    Promise.all([checkAdmin(u.uid), u.getIdTokenResult().then((t) => t.signInProvider).catch(() => null)]).then(([has, via]) => {
+      setAdmin(has && via === "google.com")
+      setAdminNeedsGoogle(has && via !== "google.com")
+    })
     getSettings().then(setSettings)
   }, [onProblem])
 
@@ -202,6 +207,7 @@ export default function App() {
         setData(null)
         setMe(null)
         setAdmin(false)
+        setAdminNeedsGoogle(false)
         setPhase("auth")
         getSettings().then(setSettings)
       }
@@ -272,7 +278,7 @@ export default function App() {
   const api = useMemo<AppApi | null>(() => {
     if (!data || !me) return null
     return {
-      data, me, commit, replaceAll, ask, go, google, connect, isAdmin: admin, settings, setSettings, outbox, refreshOutbox, theme, setTheme, logMode,
+      data, me, commit, replaceAll, ask, go, google, connect, isAdmin: admin, adminNeedsGoogle, settings, setSettings, outbox, refreshOutbox, theme, setTheme, logMode,
       disconnectGoogle: () => { disconnect(); refreshGoogle(); toast("Google disconnected on this device") },
       viewInvoice: (id, justCreated = false) => setInvoiceView({ id, justCreated }),
       openClient: (id) => { setClientView(id); setTab("clients"); window.scrollTo({ top: 0 }) },
@@ -283,7 +289,7 @@ export default function App() {
       logOut: () => leave("You’ve logged out."),
       accountDeleted: () => leave("Your account was deleted."),
     }
-  }, [data, me, commit, replaceAll, ask, go, google, connect, admin, settings, outbox, refreshOutbox, leave, clientView, theme, setTheme, logMode])
+  }, [data, me, commit, replaceAll, ask, go, google, connect, admin, settings, outbox, refreshOutbox, leave, clientView, theme, setTheme, logMode, adminNeedsGoogle])
 
   const confirm = <ConfirmDialog req={askReq} onDone={(ok) => { askResolve.current?.(ok); askResolve.current = null; setAskReq(null) }} />
   const toaster = <Toaster theme={resolvedTheme} position="bottom-center" mobileOffset={{ bottom: "calc(84px + env(safe-area-inset-bottom))" }} toastOptions={{ style: { fontFamily: "Inter, system-ui, sans-serif", borderRadius: 14 } }} />

@@ -27,7 +27,7 @@ const connLabel = (s: ConnStatus) => ({ ready: "Connected", not_connected: "Not 
 const connTone = (s: ConnStatus) => (s === "ready" ? "done" : s === "unavailable" ? "pending" : "overdue") as "done" | "pending" | "overdue"
 
 export function AccountTab() {
-  const { data, commit, me, ask, replaceAll, logOut, accountDeleted, google, connect, disconnectGoogle, settings, isAdmin, openFeedback, go, theme, setTheme } = useApp()
+  const { data, commit, me, ask, replaceAll, logOut, accountDeleted, google, connect, disconnectGoogle, settings, isAdmin, adminNeedsGoogle, openFeedback, go, theme, setTheme } = useApp()
   const p = data.profile
   const restoreRef = useRef<HTMLInputElement>(null)
   const combineRef = useRef<HTMLInputElement>(null)
@@ -198,6 +198,15 @@ export function AccountTab() {
         </span>
         <span aria-hidden className="text-muted-foreground">→</span>
       </button>
+
+      {adminNeedsGoogle && (
+        <Panel title="Admin is switched off">
+          <p className="max-w-[62ch] text-[13px] text-muted-foreground">
+            This account has admin access, but only after logging in with Google, so your Google 2-Step Verification protects it. Log out, then choose <b className="font-medium text-foreground">Continue with Google</b> with {me.email}.
+          </p>
+          <Button className="mt-3" variant="outline" onClick={logOut}><LogOut /> Log out</Button>
+        </Panel>
+      )}
 
       <Panel title="Appearance">
         <Chips<ThemePref> label="Appearance" value={theme} onChange={setTheme} options={[["dark", "Dark"], ["light", "Light"], ["system", "Match my device"]]} />
