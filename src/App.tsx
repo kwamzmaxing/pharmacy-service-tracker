@@ -329,6 +329,7 @@ export default function App() {
                   <DropdownMenuSeparator />
                   <DropdownMenuItem onSelect={() => go("home")}><House /> Home</DropdownMenuItem>
                   <DropdownMenuItem onSelect={() => go("account")}><UserRound /> Settings</DropdownMenuItem>
+                  {admin && <DropdownMenuItem onSelect={() => go("admin")}><ShieldCheck /> Admin</DropdownMenuItem>}
                   <DropdownMenuItem onSelect={() => setFeedbackOpen(true)}><MessageSquare /> Send feedback</DropdownMenuItem>
                   <DropdownMenuSeparator />
                   <DropdownMenuLabel className="pb-1 text-xs font-normal text-muted-foreground">Appearance</DropdownMenuLabel>
@@ -342,7 +343,7 @@ export default function App() {
                 </DropdownMenuContent>
               </DropdownMenu>
             </div>
-            <nav className="-mx-1 hidden gap-1 overflow-x-auto px-1 pb-3 [scrollbar-width:none] sm:flex" aria-label="Sections">
+            <nav className="-mx-1 hidden flex-wrap gap-1 px-1 pb-3 sm:flex" aria-label="Sections">
               {TABS.map(([k, l]) => {
                 const on = (SECTION[tab] ?? tab) === k
                 return (
