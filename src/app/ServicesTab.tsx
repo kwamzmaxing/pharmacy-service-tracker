@@ -1,6 +1,6 @@
 import { useState } from "react"
 import { toast } from "sonner"
-import { Trash2 } from "lucide-react"
+import { ArrowLeft, Trash2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { STD_SERVICES, uid, unitOf, UNITS, type Unit } from "@/lib/model"
@@ -10,7 +10,7 @@ import { useApp } from "./ctx"
 import { Empty, Field, MoneyField, Panel } from "./bits"
 
 export function ServicesTab() {
-  const { data, commit, ask } = useApp()
+  const { data, commit, ask, go } = useApp()
   const [name, setName] = useState("")
   const [fee, setFee] = useState("")
   const [unit, setUnit] = useState<Unit>("each")
@@ -34,6 +34,7 @@ export function ServicesTab() {
 
   return (
     <div className="grid gap-4">
+      <div><Button variant="ghost" size="sm" className="-ml-2 text-muted-foreground" onClick={() => go("account")}><ArrowLeft /> Settings</Button></div>
       <Panel title="Add a service type">
         <form onSubmit={add} className="grid gap-3 sm:grid-cols-[2fr_1fr_1fr_auto] sm:items-end">
           <Field id="s-name" label="Name" placeholder="e.g. Flu vaccination" value={name} onChange={(e) => setName(e.target.value)} />

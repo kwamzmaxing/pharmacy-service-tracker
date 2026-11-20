@@ -12,6 +12,7 @@ import {
   daysBetween, fmtDate, followUpsDue, invStatus, invoiceEmailText, isoOf, money, plural, reminderText, today, type Data, type Invoice,
 } from "@/lib/model"
 import { saveFile } from "@/lib/store"
+import { invoicePdf, pdfBase64, pdfBlob } from "@/lib/pdf"
 import { queueEmail, sendFeedback } from "@/lib/cloud"
 import { addCalendarEvent, calendarLink, GOOGLE_HELP, GoogleError, sendMail } from "@/lib/google"
 import { useApp, type AskOptions, type EmailKind } from "./ctx"
@@ -54,14 +55,8 @@ export function ConfirmDialog({ req: live, onDone }: { req: AskOptions | null; o
 }
 
 /* ---------- invoice preview ---------- */
-const utf8b64 = (t: string) => {
-  const bytes = new TextEncoder().encode(t)
-  let s = ""
-  for (let i = 0; i < bytes.length; i += 0x8000) s += String.fromCharCode(...bytes.subarray(i, i + 0x8000))
-  return btoa(s)
-}
-export function invoiceAttachment(inv: Invoice) {
-  return { filename: `${inv.number}.html`, mimeType: "text/html", content: utf8b64(invoiceFile(inv)) }
+export function invoiceAttachment(inv: Invoice, logo?: string) {
+  return { filename: `${inv.number}.pdf`, mimeType: "application/pdf", content: pdfBase64(invoicePdf(inv, logo)) }
 }
 const calDetails = (inv: Invoice) => `Expected payment for ${inv.number} from ${inv.to.name || "the pharmacy"}: ${money(inv.total)}. Logged in Service Tracker.`
 const calTitle = (inv: Invoice) => `Payment due: ${inv.number} · ${money(inv.total)}`
@@ -90,8 +85,8 @@ export function InvoiceDialog({ id, justCreated, onClose }: { id: string | null;
   }
   function download() {
     if (!inv) return
-    saveFile(inv.number + ".html", invoiceFile(inv))
-    toast.success("Invoice saved. Open the file to print it or save it as a PDF.")
+    saveFile(inv.number + ".pdf", pdfBlob(invoicePdf(inv, data.profile.logo)))
+    toast.success(`${inv.number}.pdf saved ✓`)
   }
   function print() {
     if (!inv) return
@@ -123,7 +118,7 @@ export function InvoiceDialog({ id, justCreated, onClose }: { id: string | null;
               </div>
             )}
             <div className="min-w-0 rounded-xl border p-5">
-              <InvoiceDoc inv={inv} />
+              <InvoiceDoc inv={inv} logo={data.profile.logo} />
             </div>
             <div className="flex flex-wrap items-center gap-2 text-[12.5px] text-muted-foreground">
               <CalendarDays className="size-4" />
@@ -138,7 +133,7 @@ export function InvoiceDialog({ id, justCreated, onClose }: { id: string | null;
             </div>
             <DialogFooter className="flex-col gap-2 sm:flex-row sm:items-center">
               <Button variant="outline" onClick={onClose}>Close</Button>
-              <Button variant="outline" onClick={download}><Download /> Download</Button>
+              <Button variant="outline" onClick={download}><Download /> Download PDF</Button>
               <Button variant="outline" onClick={print}><Printer /> Print</Button>
               {(!justCreated || emailed) && st !== "paid" && (
                 <Button onClick={() => email(inv.id, emailed && st === "overdue" ? "followup" : "invoice")}>
@@ -208,7 +203,7 @@ export function EmailDialog({ req, onClose, onBack }: { req: { id: string; kind:
     setBusy("send")
     setNote("")
     try {
-      await sendMail({ to: to.trim(), subject, body, attachments: attach ? [invoiceAttachment(inv)] : undefined }, me.email)
+      await sendMail({ to: to.trim(), subject, body, attachments: attach ? [invoiceAttachment(inv, data.profile.logo)] : undefined }, me.email)
       record("gmail", `Sent to ${to.trim()} ✓`, true)
       onClose()
     } catch (e) {
@@ -222,7 +217,7 @@ export function EmailDialog({ req, onClose, onBack }: { req: { id: string; kind:
     if (!to.trim()) return setNote("Add the pharmacy’s email address first.")
     setBusy("admin")
     try {
-      const att = attach ? invoiceAttachment(inv) : undefined
+      const att = attach ? invoiceAttachment(inv, data.profile.logo) : undefined
       await queueEmail({
         uid: me.uid, name: data.profile.fullName || me.name || me.email, email: me.email,
         kind, invoiceId: inv.id, invoiceNumber: inv.number, to: to.trim(), subject, body,
@@ -286,7 +281,7 @@ export function EmailDialog({ req, onClose, onBack }: { req: { id: string; kind:
               {(mine || relay) && (
                 <label htmlFor="em-attach" className="flex cursor-pointer items-center gap-2 text-[13px] text-muted-foreground">
                   <Checkbox id="em-attach" checked={attach} onCheckedChange={(x) => setAttach(x === true)} />
-                  Attach the invoice ({inv.number}.html)
+                  Attach the invoice ({inv.number}.pdf)
                 </label>
               )}
             </div>

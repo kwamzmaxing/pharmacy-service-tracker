@@ -18,6 +18,11 @@ service cloud.firestore {
       match /docs/{docId} {
         allow read, write: if me(uid);
       }
+      // Receipt photos for expenses: private to the person, one image per document.
+      match /receipts/{receiptId} {
+        allow read, delete: if me(uid);
+        allow create, update: if me(uid) && request.resource.data.image is string && request.resource.data.image.size() < 1000000;
+      }
     }
 
     match /feedback/{id} {

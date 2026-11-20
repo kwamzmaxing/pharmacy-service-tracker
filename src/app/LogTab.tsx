@@ -6,12 +6,15 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { entryAmt, feeText, fmtDate, money, qtyText, today, uid, unitOf, UNITS, type Data, type Entry } from "@/lib/model"
 import { useApp } from "./ctx"
 import { Empty, Field, MoneyField, Panel, Pill } from "./bits"
+import { JourneyForm } from "./JourneyForm"
+import { cn } from "@/lib/utils"
 
 const hoursService = (d: Data) => d.services.find((s) => /hour/i.test(s.name))
 
 export function LogTab() {
   const { data, commit, ask } = useApp()
   const [editingId, setEditingId] = useState<string | null>(null)
+  const [mode, setMode] = useState<"service" | "hours" | "journey">("service")
   const editing = editingId ? data.entries.find((e) => e.id === editingId) : undefined
 
   const lastClient = (data.meta.lastClientId as string | undefined) ?? ""
@@ -87,9 +90,42 @@ export function LogTab() {
     if (editingId === e.id) setEditingId(null)
   }
 
+  const pharmacyPicker = data.clients.length > 0 && (
+    <div className="grid gap-1.5 sm:max-w-sm">
+      <Label htmlFor="f-client" className="text-xs font-semibold text-muted-foreground">Pharmacy</Label>
+      <Select value={form.clientId || "none"} onValueChange={(v) => setForm({ ...form, clientId: v === "none" ? "" : v })}>
+        <SelectTrigger id="f-client" className="h-10 bg-field text-[14.5px] shadow-none"><SelectValue /></SelectTrigger>
+        <SelectContent>
+          {data.clients.map((c) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
+          <SelectItem value="none">Not for a particular pharmacy</SelectItem>
+        </SelectContent>
+      </Select>
+    </div>
+  )
+
   return (
     <div className="grid gap-4">
-      <Panel title={editing ? "Edit entry" : "Add a service"}>
+      <Panel title={editing ? "Edit entry" : "Add to your log"} aside={!editing && (
+        <div role="tablist" aria-label="What to add" className="flex rounded-lg bg-secondary p-0.5">
+          {([["service", "Service"], ["hours", "Hours"], ["journey", "Journey"]] as const).map(([k, l]) => (
+            <button key={k} role="tab" type="button" aria-selected={mode === k} onClick={() => setMode(k)}
+              className={cn("rounded-md px-3 py-1.5 text-[13px] font-semibold text-muted-foreground transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring", mode === k && "bg-card text-foreground shadow-sm")}>
+              {l}
+            </button>
+          ))}
+        </div>
+      )}>
+        {mode === "journey" && !editing ? <JourneyForm /> : mode === "hours" && !editing ? (
+        <form className="grid gap-3" onSubmit={(e) => { e.preventDefault(); saveHours() }}>
+          {pharmacyPicker}
+          <div className="grid gap-3 sm:grid-cols-[1fr_1fr_auto] sm:items-end">
+            <Field id="h-date" label="Date" type="date" value={hDate} onChange={(e) => setHDate(e.target.value || today())} />
+            <Field id="h-hours" label="Hours that day" type="number" min={0} step="0.25" inputMode="decimal" placeholder="e.g. 7.5" value={hours} onChange={(e) => setHours(e.target.value)} />
+            <Button type="submit" className="h-10 px-5">{existingHours ? "Update hours" : "Save hours"}</Button>
+          </div>
+          <p className="text-[12.5px] text-muted-foreground">At £{hs?.fee ?? 25}/hr{form.clientId ? ` for ${data.clients.find((c) => c.id === form.clientId)?.name ?? "the selected pharmacy"}` : ""}. Saving again for the same day replaces that day’s hours. Change the rate under Settings → Services.</p>
+        </form>
+        ) : (
         <form
           className="grid gap-3"
           onSubmit={(ev) => {
@@ -97,18 +133,7 @@ export function LogTab() {
             saveEntry()
           }}
         >
-          {data.clients.length > 0 && (
-            <div className="grid gap-1.5 sm:max-w-sm">
-              <Label htmlFor="f-client" className="text-xs font-semibold text-muted-foreground">Pharmacy</Label>
-              <Select value={form.clientId || "none"} onValueChange={(v) => setForm({ ...form, clientId: v === "none" ? "" : v })}>
-                <SelectTrigger id="f-client" className="h-10 bg-field text-[14.5px] shadow-none"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  {data.clients.map((c) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
-                  <SelectItem value="none">Not for a particular pharmacy</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          )}
+          {pharmacyPicker}
           <div className="grid gap-3 sm:grid-cols-[1.4fr_1fr_0.7fr]">
             <div className="grid gap-1.5">
               <Label htmlFor="f-svc" className="text-xs font-semibold text-muted-foreground">Service</Label>
@@ -134,17 +159,7 @@ export function LogTab() {
             )}
           </div>
         </form>
-      </Panel>
-
-      <Panel title="Hours worked" aside={`£${hs?.fee ?? 25}/hr`}>
-        <form className="grid gap-3" onSubmit={(e) => { e.preventDefault(); saveHours() }}>
-          <div className="grid gap-3 sm:grid-cols-[1fr_1fr_auto] sm:items-end">
-            <Field id="h-date" label="Date" type="date" value={hDate} onChange={(e) => setHDate(e.target.value || today())} />
-            <Field id="h-hours" label="Hours that day" type="number" min={0} step="0.25" inputMode="decimal" placeholder="e.g. 7.5" value={hours} onChange={(e) => setHours(e.target.value)} />
-            <Button type="submit" className="h-10 px-5">{existingHours ? "Update hours" : "Save hours"}</Button>
-          </div>
-          <p className="text-[12.5px] text-muted-foreground">Saving again for the same day replaces that day’s hours. Change the hourly rate on the Services tab.</p>
-        </form>
+        )}
       </Panel>
 
       <Panel title="Recent entries" aside={list.length ? `${list.length} total` : undefined}>

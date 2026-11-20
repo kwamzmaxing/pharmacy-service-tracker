@@ -14,7 +14,8 @@ import {
   type Data, type Entry, type Profile, type Terms,
 } from "@/lib/model"
 import { auth } from "@/lib/firebase"
-import { forgetPerson, wipeVault } from "@/lib/cloud"
+import { forgetPerson, wipeReceipts, wipeVault } from "@/lib/cloud"
+import { shrinkImage } from "@/lib/images"
 import { saveFile } from "@/lib/store"
 import type { ConnStatus } from "@/lib/google"
 import { useApp } from "./ctx"
@@ -161,6 +162,7 @@ export function AccountTab() {
     if (!u) return
     try {
       await wipeVault(u.uid)
+      await wipeReceipts(u.uid).catch(() => {})
       await forgetPerson(u.uid).catch(() => {})
       try {
         await deleteUser(u)
@@ -186,6 +188,15 @@ export function AccountTab() {
 
   return (
     <div className="grid gap-4">
+      <button type="button" onClick={() => go("services")}
+        className="flex items-center justify-between gap-3 rounded-[10px] border bg-card px-5 py-4 text-left hover:border-primary/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+        <span>
+          <span className="block font-display text-[16px] font-bold tracking-[-0.015em]">Services & rates</span>
+          <span className="text-[13px] text-muted-foreground">{data.services.length} services · {data.services.map((s) => s.name).slice(0, 3).join(", ")}{data.services.length > 3 ? "…" : ""}</span>
+        </span>
+        <span aria-hidden className="text-muted-foreground">→</span>
+      </button>
+
       <Panel title="Logged in" aside={me.viaGoogle ? "with Google" : me.emailVerified ? "email verified" : "email not verified yet"}>
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="min-w-0">
@@ -257,6 +268,17 @@ export function AccountTab() {
         <div className="grid gap-5">
           <fieldset className="grid gap-3 sm:grid-cols-2">
             <legend className="mb-2 text-[11px] font-bold uppercase tracking-[0.08em] text-muted-foreground">From (you)</legend>
+            <div className="flex flex-wrap items-center gap-3 sm:col-span-2">
+              {p.logo ? <img src={p.logo} alt="Your invoice logo" className="h-12 max-w-[160px] rounded border bg-white object-contain p-1" /> : <span className="flex h-12 w-24 items-center justify-center rounded border border-dashed text-[12px] text-muted-foreground">No logo</span>}
+              <input id="p-logo" type="file" accept="image/png,image/jpeg,image/webp" hidden onChange={async (e) => {
+                const f = e.target.files?.[0]; e.target.value = ""
+                if (!f) return
+                try { set("logo", await shrinkImage(f, 480, "image/png")) } catch { toast.error("That image couldn’t be used as a logo.") }
+              }} />
+              <Button type="button" variant="outline" size="sm" onClick={() => document.getElementById("p-logo")?.click()}>{p.logo ? "Change logo" : "Add a logo"}</Button>
+              {p.logo && <Button type="button" variant="ghost" size="sm" onClick={() => commit((d) => void delete d.profile.logo, "Logo removed")}>Remove</Button>}
+              <span className="text-[12px] text-muted-foreground">Shown at the top of your invoices.</span>
+            </div>
             {text("fullName", "Full name", { autoComplete: "name" })}
             {text("tradingName", "Trading / business name (optional)", { autoComplete: "organization" })}
             {text("email", "Email shown on invoices", { type: "email", autoComplete: "email" })}

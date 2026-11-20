@@ -1,5 +1,6 @@
 import { useState } from "react"
 import { Button } from "@/components/ui/button"
+import { ArrowLeft } from "lucide-react"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectSeparator, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { addCalendarEvent, hasToken } from "@/lib/google"
@@ -67,6 +68,7 @@ export function SummaryTab() {
 
   return (
     <div className="grid gap-4">
+      <div><Button variant="ghost" size="sm" className="-ml-2 text-muted-foreground" onClick={() => go("invoices")}><ArrowLeft /> Invoices</Button></div>
       <Panel title="Create an invoice">
         <div className="grid gap-4">
           <div className="grid gap-1.5 sm:max-w-sm">

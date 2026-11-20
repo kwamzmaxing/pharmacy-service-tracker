@@ -3,7 +3,7 @@ import type { Data } from "@/lib/model"
 import type { OutboxItem, PublicSettings } from "@/lib/cloud"
 import type { ConnStatus, GoogleArea } from "@/lib/google"
 
-export type Tab = "log" | "summary" | "invoices" | "clients" | "services" | "account" | "admin"
+export type Tab = "log" | "summary" | "invoices" | "expenses" | "tax" | "clients" | "services" | "account" | "admin"
 export type EmailKind = "invoice" | "followup"
 export type Me = { uid: string; email: string; name: string; emailVerified: boolean; viaGoogle: boolean }
 

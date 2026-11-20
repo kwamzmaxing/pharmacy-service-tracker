@@ -1,5 +1,6 @@
 import { useState } from "react"
 import { Button } from "@/components/ui/button"
+import { Plus } from "lucide-react"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { cn } from "@/lib/utils"
 import { daysBetween, daysToPay, fmtDate, followUpsDue, insights, invStatus, isoOf, money, monthLabel, monthly, nextFollowUp, plural, taxYear, today, type Invoice, type Profile, type Status } from "@/lib/model"
@@ -65,6 +66,10 @@ export function InvoicesTab() {
 
   return (
     <div className="grid gap-4">
+      <div className="flex items-center justify-between gap-3">
+        <h2 className="font-display text-[20px] font-bold tracking-[-0.02em]">Invoices</h2>
+        <Button onClick={() => go("summary")}><Plus /> Create invoice</Button>
+      </div>
       <Ledger
         cells={[
           { label: "Owed to you", value: money(sum(out)), sub: out.length ? plural(out.length, "unpaid invoice") : "Nothing outstanding" },

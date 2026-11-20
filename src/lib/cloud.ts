@@ -146,3 +146,15 @@ export async function listOutbox(): Promise<OutboxItem[]> {
 }
 export const markOutbox = (id: string, patch: Partial<OutboxItem>) =>
   updateDoc(doc(db, "outbox", id), { ...patch, doneAt: new Date().toISOString(), ...(patch.status === "done" ? { attachment: null } : {}) })
+
+/* ---------- receipt photos: users/{uid}/receipts/{id}, kept out of the main tracker documents ---------- */
+export const saveReceipt = (uid: string, id: string, image: string) => setDoc(doc(db, "users", uid, "receipts", id), { image, at: new Date().toISOString() })
+export async function getReceipt(uid: string, id: string): Promise<string | null> {
+  const s = await getDoc(doc(db, "users", uid, "receipts", id))
+  return s.exists() ? (s.data().image as string) : null
+}
+export const deleteReceipt = (uid: string, id: string) => deleteDoc(doc(db, "users", uid, "receipts", id))
+export async function wipeReceipts(uid: string) {
+  const snap = await getDocs(collection(db, "users", uid, "receipts"))
+  await Promise.all(snap.docs.map((d) => deleteDoc(d.ref)))
+}

@@ -25,6 +25,8 @@ export type Entry = {
   hours?: boolean
   /** Which pharmacy this work was for. */
   clientId?: string
+  /** The saved journey this mileage came from. */
+  journeyId?: string
 }
 export type Terms = "14th" | "0" | "7" | "14" | "30"
 export type Profile = {
@@ -52,6 +54,48 @@ export type Profile = {
   calendar: boolean
   /** How invoice and follow-up emails go out by default. */
   sendVia: "mine" | "admin"
+  /** Small image shown at the top of invoices (data URL). */
+  logo?: string
+  /** For HMRC mileage rates. */
+  vehicle: Vehicle
+  /** Postcode the journey calculator starts from. */
+  homePostcode?: string
+  /** Scottish taxpayer (different income tax bands). */
+  scotland?: boolean
+  /** Yearly income from employment (PAYE), to place self-employed profit in the right tax bands. */
+  otherIncome?: number
+  /** Count income when it's paid (cash basis, HMRC's default) or when the work was done. */
+  taxBasis?: "cash" | "earned"
+}
+export type Vehicle = "car" | "motorcycle" | "bicycle"
+/** A place used by the journey calculator. */
+export type Place = { label: string; query: string; postcode?: string; lat: number; lng: number }
+export type Journey = {
+  id: string
+  from: Place
+  to: Place
+  /** One way, in miles. */
+  miles: number
+  minutes?: number
+  returnTrip: boolean
+  /** Route line for the map: [lat, lng] pairs, simplified. */
+  path?: [number, number][]
+  approximate?: boolean
+  clientId?: string
+  created: string
+  lastUsed?: string
+  uses: number
+}
+export type ExpenseCategory = "travel" | "accommodation" | "subsistence" | "fees" | "insurance" | "training" | "phone" | "equipment" | "accountancy" | "other"
+export type Expense = {
+  id: string
+  date: string
+  category: ExpenseCategory
+  amount: number
+  desc: string
+  clientId?: string
+  /** A receipt photo stored separately (users/{uid}/receipts/{id}). */
+  receiptId?: string
 }
 export type InvoiceLine = { name: string; fee: number; qty: number; amt: number; unit?: Unit }
 export type Invoice = {
@@ -81,6 +125,8 @@ export type Invoice = {
 export type Data = {
   services: Service[]
   clients: Client[]
+  journeys: Journey[]
+  expenses: Expense[]
   entries: Entry[]
   invoices: Invoice[]
   profile: Profile
@@ -152,12 +198,13 @@ export const defaultProfile = (): Profile => ({
   accountName: "", bankName: "", sortCode: "", accountNumber: "",
   terms: "14th", prefix: "INV", nextNo: 1,
   followUpDays: 0, followUpRepeat: 7, calendar: true, sendVia: "mine",
+  vehicle: "car", scotland: false, otherIncome: 0, taxBasis: "cash",
 })
 export function newData(name = ""): Data {
   const profile = defaultProfile()
   profile.fullName = name
   profile.accountName = name
-  return { services: STD_SERVICES(), clients: [], entries: [], invoices: [], profile, meta: { ratesV: "d1", mileage: 1, clients: 1 } }
+  return { services: STD_SERVICES(), clients: [], journeys: [], expenses: [], entries: [], invoices: [], profile, meta: { ratesV: "d1", mileage: 1, clients: 1 } }
 }
 /** Fill in anything missing, so old back-ups and older saved data still load. */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -195,6 +242,8 @@ export function normalize(raw: any): Data {
   return {
     services,
     clients,
+    journeys: Array.isArray(d.journeys) ? d.journeys : [],
+    expenses: Array.isArray(d.expenses) ? d.expenses : [],
     entries: Array.isArray(d.entries) ? d.entries : [],
     invoices,
     profile,
@@ -370,9 +419,13 @@ export function reminderText(inv: Invoice, p: Profile) {
 export type DocMap = Record<string, Record<string, unknown>>
 export function buildDocs(d: Data): DocMap {
   const docs: DocMap = { core: { services: d.services, clients: d.clients, profile: d.profile, meta: d.meta, v: 2 } }
-  for (const e of d.entries) {
-    const k = "m-" + (/^\d{4}-\d{2}/.test(e.date || "") ? e.date.slice(0, 7) : "other")
-    ;((docs[k] ??= { entries: [] }).entries as Entry[]).push(e)
+  // Journeys keep a route line each, so they get their own document instead of growing "core"
+  if (d.journeys.length) docs.journeys = { journeys: d.journeys }
+  const monthKey = (date: string) => "m-" + (/^\d{4}-\d{2}/.test(date || "") ? date.slice(0, 7) : "other")
+  for (const e of d.entries) ((docs[monthKey(e.date)] ??= { entries: [] }).entries as Entry[]).push(e)
+  for (const x of d.expenses) {
+    const m = (docs[monthKey(x.date)] ??= { entries: [] })
+    ;((m.expenses ??= []) as Expense[]).push(x)
   }
   for (const i of d.invoices) docs["inv-" + i.id] = { invoice: i }
   return JSON.parse(JSON.stringify(docs))
@@ -380,9 +433,12 @@ export function buildDocs(d: Data): DocMap {
 export function assembleDocs(docs: DocMap): Data | null {
   const core = docs.core
   if (!core) return null
-  const d = { services: core.services, clients: core.clients, profile: core.profile, meta: core.meta || {}, entries: [] as Entry[], invoices: [] as Invoice[] }
+  const d = { services: core.services, clients: core.clients, profile: core.profile, meta: core.meta || {}, journeys: (docs.journeys?.journeys as Journey[]) || [], entries: [] as Entry[], expenses: [] as Expense[], invoices: [] as Invoice[] }
   for (const k of Object.keys(docs).sort()) {
-    if (k.startsWith("m-")) d.entries.push(...((docs[k].entries as Entry[]) || []))
+    if (k.startsWith("m-")) {
+      d.entries.push(...((docs[k].entries as Entry[]) || []))
+      d.expenses.push(...((docs[k].expenses as Expense[]) || []))
+    }
     else if (k.startsWith("inv-") && docs[k].invoice) d.invoices.push(docs[k].invoice as Invoice)
   }
   return normalize(d)
@@ -473,4 +529,125 @@ export function insights(d: Data): Insight[] {
     if (s) out.push({ tone: "info", text: `${s.name} is your biggest earner this month: ${money(top[1])}, ${Math.round((top[1] / cur.logged) * 100)}% of the total.` })
   }
   return out.slice(0, 5)
+}
+
+/* ---------- expenses ---------- */
+export const EXPENSE_CATEGORIES: [ExpenseCategory, string, string][] = [
+  ["travel", "Travel", "Train, bus, taxi, parking and tolls"],
+  ["accommodation", "Accommodation", "Hotels for shifts away from home"],
+  ["subsistence", "Food on overnight trips", "Meals while staying away for work"],
+  ["fees", "Professional fees", "GPhC, RPS and other memberships"],
+  ["insurance", "Indemnity insurance", "Professional indemnity cover"],
+  ["training", "Training and CPD", "Courses, exams and books for your role"],
+  ["phone", "Phone and internet", "The business share of your bills"],
+  ["equipment", "Equipment and stationery", "Tools, uniform, printing and postage"],
+  ["accountancy", "Accountancy", "Accountant and software fees"],
+  ["other", "Other", "Anything else wholly for work"],
+]
+export const categoryName = (c: ExpenseCategory) => EXPENSE_CATEGORIES.find((x) => x[0] === c)?.[1] ?? "Other"
+
+/* ---------- mileage (HMRC simplified rates) ---------- */
+export const VEHICLES: [Vehicle, string][] = [["car", "Car or van"], ["motorcycle", "Motorcycle"], ["bicycle", "Bicycle"]]
+/** HMRC approved mileage rates for a tax year (first 10,000 business miles, then the rest). */
+export function mileageRates(vehicle: Vehicle, taxYearStart: number) {
+  if (vehicle === "motorcycle") return { first: 0.24, after: 0.24 }
+  if (vehicle === "bicycle") return { first: 0.2, after: 0.2 }
+  return { first: taxYearStart >= 2026 ? 0.55 : 0.45, after: 0.25 }
+}
+export function mileageAllowance(miles: number, vehicle: Vehicle, taxYearStart: number) {
+  const r = mileageRates(vehicle, taxYearStart)
+  const first = Math.min(miles, 10000)
+  const after = Math.max(0, miles - 10000)
+  return { first, after, rates: r, amount: first * r.first + after * r.after }
+}
+/** "LS1 4AP" style postcode inside any text (for pharmacy addresses). */
+export const postcodeIn = (t: string) => (t.toUpperCase().match(/\b([A-Z]{1,2}\d[A-Z\d]?)\s*(\d[A-Z]{2})\b/) || []).slice(1).join(" ") || ""
+
+/* ---------- UK tax estimate (2026/27 rates) ---------- */
+// Sources: House of Commons Library "Direct taxes: rates and allowances 2026/27"; mygov.scot current rates.
+const PA = 12570
+const RUK_BANDS: [number, number, string][] = [[37700, 0.2, "Basic rate 20%"], [125140, 0.4, "Higher rate 40%"], [Infinity, 0.45, "Additional rate 45%"]]
+// Scottish bands as widths of taxable income above the personal allowance
+const SCOT_BANDS: [number, number, string][] = [
+  [16537 - PA, 0.19, "Starter rate 19%"], [29526 - PA, 0.2, "Basic rate 20%"], [43662 - PA, 0.21, "Intermediate rate 21%"],
+  [75000 - PA, 0.42, "Higher rate 42%"], [125140, 0.45, "Advanced rate 45%"], [Infinity, 0.48, "Top rate 48%"],
+]
+export type TaxLine = { label: string; amount: number; tax: number }
+export function incomeTax(totalIncome: number, scotland = false) {
+  const allowance = Math.max(0, PA - Math.max(0, totalIncome - 100000) / 2)
+  let taxable = Math.max(0, totalIncome - allowance)
+  const lines: TaxLine[] = []
+  let floor = 0
+  for (const [top, rate, label] of scotland ? SCOT_BANDS : RUK_BANDS) {
+    const amt = Math.max(0, Math.min(taxable, top - floor))
+    if (amt > 0) lines.push({ label, amount: amt, tax: amt * rate })
+    taxable -= amt
+    floor = top
+    if (taxable <= 0) break
+  }
+  return { allowance, lines, tax: lines.reduce((a, l) => a + l.tax, 0) }
+}
+export function class4(profit: number) {
+  const main = Math.max(0, Math.min(profit, 50270) - 12570)
+  const upper = Math.max(0, profit - 50270)
+  const lines: TaxLine[] = []
+  if (main) lines.push({ label: "Class 4 NI 6%", amount: main, tax: main * 0.06 })
+  if (upper) lines.push({ label: "Class 4 NI 2%", amount: upper, tax: upper * 0.02 })
+  return { lines, tax: lines.reduce((a, l) => a + l.tax, 0) }
+}
+
+export type TaxSummary = {
+  year: ReturnType<typeof taxYear>
+  income: number
+  incomeLines: { label: string; amount: number }[]
+  expenses: number
+  byCategory: { category: ExpenseCategory; amount: number }[]
+  miles: number
+  mileage: ReturnType<typeof mileageAllowance>
+  profit: number
+  tax: ReturnType<typeof incomeTax>
+  /** Income tax caused by self-employment (on top of tax on other income). */
+  incomeTaxDue: number
+  ni: ReturnType<typeof class4>
+  total: number
+  /** Share of the tax year that has passed (0–1). */
+  elapsed: number
+}
+export function taxSummary(d: Data, yearOf = today()): TaxSummary {
+  const ty = taxYear(yearOf)
+  const inYear = (date?: string | null) => !!date && date >= ty.from && date <= ty.to
+  const p = d.profile
+  const basis = p.taxBasis || "cash"
+  const incomeLines: { label: string; amount: number }[] = []
+  if (basis === "cash") {
+    const paid = d.invoices.filter((i) => i.status === "paid" && inYear(i.paidDate))
+    incomeLines.push({ label: `Invoices paid (${paid.length})`, amount: sum(paid.map((i) => i.total)) })
+  } else {
+    incomeLines.push({ label: "Work logged", amount: sum(d.entries.filter((e) => inYear(e.date)).map(entryAmt)) })
+  }
+  const income = sum(incomeLines.map((l) => l.amount))
+  const ex = d.expenses.filter((x) => inYear(x.date))
+  const cats: Record<string, number> = {}
+  for (const x of ex) cats[x.category] = (cats[x.category] || 0) + (Number(x.amount) || 0)
+  const byCategory = Object.entries(cats).map(([category, amount]) => ({ category: category as ExpenseCategory, amount })).sort((a, b) => b.amount - a.amount)
+  const expenses = sum(byCategory.map((c) => c.amount))
+  const mileSvc = new Set(d.services.filter((s) => unitOf(s) === "mile").map((s) => s.id))
+  const miles = sum(d.entries.filter((e) => mileSvc.has(e.serviceId) && inYear(e.date)).map((e) => Number(e.qty) || 0))
+  const startYear = Number(ty.from.slice(0, 4))
+  const mileage = mileageAllowance(miles, p.vehicle || "car", startYear)
+  const profit = Math.max(0, income - expenses - mileage.amount)
+  const other = Math.max(0, Number(p.otherIncome) || 0)
+  const tax = incomeTax(profit + other, !!p.scotland)
+  const incomeTaxDue = Math.max(0, tax.tax - incomeTax(other, !!p.scotland).tax)
+  const ni = class4(profit)
+  const t = today()
+  const elapsed = t < ty.from ? 0 : t > ty.to ? 1 : Math.min(1, (daysBetween(ty.from, t) + 1) / 365)
+  return { year: ty, income, incomeLines, expenses, byCategory, miles, mileage, profit, tax, incomeTaxDue, ni, total: incomeTaxDue + ni.tax, elapsed }
+}
+/** Tax years that have any activity, newest first (always includes the current one). */
+export function taxYearsWithData(d: Data) {
+  const dates = [...d.entries.map((e) => e.date), ...d.expenses.map((x) => x.date), ...d.invoices.map((i) => i.paidDate || i.issued), today()]
+  const ys = new Map<string, ReturnType<typeof taxYear>>()
+  for (const x of dates) if (x) { const y = taxYear(x); ys.set(y.from, y) }
+  return [...ys.values()].sort((a, b) => b.from.localeCompare(a.from))
 }

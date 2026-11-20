@@ -9,13 +9,14 @@ const Lines = ({ text }: { text: string }) => (
   </>
 )
 
-export function InvoiceDoc({ inv }: { inv: Invoice }) {
+export function InvoiceDoc({ inv, logo }: { inv: Invoice; logo?: string }) {
   const f = inv.from, t = inv.to, pay = inv.pay
   const paid = invStatus(inv) === "paid"
   return (
     <div className="inv">
       <div className="mb-5 flex flex-col justify-between gap-5 border-b-2 border-foreground pb-4 sm:flex-row sm:items-start">
         <div>
+          {logo && <img src={logo} alt="" className="mb-2 max-h-14 max-w-[180px] object-contain" />}
           <h3 className="font-display text-[26px] font-bold leading-tight tracking-[-0.01em]">Invoice</h3>
           <div className="mt-0.5 font-semibold text-muted-foreground">{inv.number}</div>
           {paid && (

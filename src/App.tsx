@@ -20,9 +20,13 @@ import { InvoicesTab } from "@/app/InvoicesTab"
 import { ServicesTab } from "@/app/ServicesTab"
 import { AccountTab } from "@/app/AccountTab"
 import { ClientsTab } from "@/app/ClientsTab"
+import { ExpensesTab } from "@/app/ExpensesTab"
+import { TaxTab } from "@/app/TaxTab"
 import { AdminTab, processOutbox } from "@/app/AdminTab"
 
-const BASE_TABS: [Tab, string][] = [["log", "Log"], ["summary", "Summary"], ["invoices", "Invoices"], ["clients", "Pharmacies"], ["services", "Services"], ["account", "Account"]]
+const BASE_TABS: [Tab, string][] = [["log", "Log"], ["invoices", "Invoices"], ["expenses", "Expenses"], ["tax", "Tax"], ["clients", "Pharmacies"], ["account", "Settings"]]
+/** Pages without their own tab light up the tab they belong to. */
+const SECTION: Partial<Record<Tab, Tab>> = { summary: "invoices", services: "account" }
 const PROBLEM_TEXT: Record<SaveProblem, string> = {
   offline: "You’re offline. Changes are kept on this device and saved when you reconnect.",
   full: "Storage is full. Delete some old invoices or entries.",
@@ -259,11 +263,11 @@ export default function App() {
             </div>
             <nav className="-mx-2 flex overflow-x-auto px-2 [scrollbar-width:none]" aria-label="Sections">
               {TABS.map(([k, l]) => (
-                <button key={k} type="button" aria-current={tab === k ? "page" : undefined} onClick={() => go(k)}
+                <button key={k} type="button" aria-current={(SECTION[tab] ?? tab) === k ? "page" : undefined} onClick={() => go(k)}
                   className={cn(
                     "relative flex flex-none items-center gap-1.5 whitespace-nowrap px-3 pb-2.5 pt-1.5 text-[14px] font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring",
                     "after:absolute after:inset-x-3 after:bottom-0 after:h-[2px] after:rounded-full",
-                    tab === k ? "text-foreground after:bg-primary" : "text-muted-foreground hover:text-foreground after:bg-transparent",
+                    (SECTION[tab] ?? tab) === k ? "text-foreground after:bg-primary" : "text-muted-foreground hover:text-foreground after:bg-transparent",
                   )}>
                   {l}
                   {k === "invoices" && due > 0 && (
@@ -281,6 +285,8 @@ export default function App() {
           {tab === "invoices" && <InvoicesTab />}
           {tab === "services" && <ServicesTab />}
           {tab === "clients" && <ClientsTab />}
+          {tab === "expenses" && <ExpensesTab />}
+          {tab === "tax" && <TaxTab />}
           {tab === "account" && <AccountTab />}
           {tab === "admin" && admin && <AdminTab />}
         </main>
