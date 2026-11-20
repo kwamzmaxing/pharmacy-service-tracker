@@ -2,8 +2,8 @@ import { useEffect, useRef, useState } from "react"
 import { money, type MonthPoint } from "@/lib/model"
 
 const SERIES = [
-  { key: "logged", label: "Earned (logged)", color: "var(--series-logged)" },
-  { key: "paid", label: "Paid to you", color: "var(--series-paid)" },
+  { key: "logged", label: "Work logged", color: "var(--series-logged)" },
+  { key: "paid", label: "Paid for so far", color: "var(--series-paid)" },
 ] as const
 
 function niceMax(v: number) {
@@ -14,7 +14,7 @@ function niceMax(v: number) {
 }
 const short = (v: number) => (v >= 1000 ? `£${(v / 1000).toFixed(v % 1000 === 0 ? 0 : 1)}k` : `£${Math.round(v)}`)
 
-/** Earned vs paid per month: grouped bars, one y-axis, hover for exact values. */
+/** Per month worked: work logged vs how much of it has been paid for. Grouped bars, one y-axis, hover for exact values. */
 export function MonthlyBars({ points }: { points: MonthPoint[] }) {
   const wrap = useRef<HTMLDivElement>(null)
   const [w, setW] = useState(600)
@@ -53,13 +53,13 @@ export function MonthlyBars({ points }: { points: MonthPoint[] }) {
       {table ? (
         <div className="overflow-x-auto">
           <table className="w-full text-[13px]">
-            <thead><tr className="text-left text-[11px] uppercase tracking-[0.06em] text-muted-foreground"><th className="py-1.5 font-bold">Month</th><th className="py-1.5 text-right font-bold">Earned</th><th className="py-1.5 text-right font-bold">Paid</th></tr></thead>
+            <thead><tr className="text-left text-[11px] uppercase tracking-[0.06em] text-muted-foreground"><th className="py-1.5 font-bold">Month</th><th className="py-1.5 text-right font-bold">Logged</th><th className="py-1.5 text-right font-bold">Paid for</th></tr></thead>
             <tbody className="divide-y">{points.map((p) => <tr key={p.ym}><td className="py-1.5">{p.label}</td><td className="num py-1.5 text-right">{money(p.logged)}</td><td className="num py-1.5 text-right">{money(p.paid)}</td></tr>)}</tbody>
           </table>
         </div>
       ) : (
         <div ref={wrap} className="relative" onMouseLeave={() => setHover(null)}>
-          <svg width="100%" height={h} viewBox={`0 0 ${w} ${h}`} role="img" aria-label={`Earned and paid over the last ${points.length} months`} className="block overflow-visible">
+          <svg width="100%" height={h} viewBox={`0 0 ${w} ${h}`} role="img" aria-label={`Work logged and paid for, by month worked, over the last ${points.length} months`} className="block overflow-visible">
             {ticks.map((t) => (
               <g key={t}>
                 <line x1={padL} x2={w - padR} y1={y(t)} y2={y(t)} stroke="hsl(var(--border))" strokeWidth={1} strokeDasharray={t === 0 ? undefined : "2 4"} />
@@ -97,7 +97,7 @@ export function MonthlyBars({ points }: { points: MonthPoint[] }) {
               <div className="mb-1 font-semibold">{points[hover].label}</div>
               {SERIES.map((s) => (
                 <div key={s.key} className="flex items-center justify-between gap-4">
-                  <span className="flex items-center gap-1.5 text-muted-foreground"><span className="size-2 rounded-[2px]" style={{ background: s.color }} />{s.key === "logged" ? "Earned" : "Paid"}</span>
+                  <span className="flex items-center gap-1.5 text-muted-foreground"><span className="size-2 rounded-[2px]" style={{ background: s.color }} />{s.key === "logged" ? "Logged" : "Paid for"}</span>
                   <span className="num font-semibold">{money(points[hover][s.key])}</span>
                 </div>
               ))}
