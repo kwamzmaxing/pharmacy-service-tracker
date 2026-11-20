@@ -102,3 +102,16 @@
 .inv th { text-align: left; font-size: 10.5px; text-transform: uppercase; letter-spacing: .06em; color: hsl(var(--muted-foreground)); border-bottom: 1px solid hsl(var(--border)); padding: 8px 6px; font-weight: 700; }
 .inv td { padding: 9px 6px; border-bottom: 1px solid hsl(var(--border)); }
 .inv .r { text-align: right; }
+
+/* Journey map: OpenStreetMap tiles, darkened in dark mode */
+[data-theme="dark"] .route-tiles { filter: invert(1) hue-rotate(180deg) brightness(0.92) contrast(0.88) saturate(0.6); }
+[data-theme="dark"] .leaflet-container { background: hsl(var(--secondary)); }
+
+/* iPhone date boxes: keep them inside their column and left-aligned like other boxes */
+input[type="date"] { -webkit-appearance: none; appearance: none; min-width: 0; max-width: 100%; text-align: left; }
+input[type="date"]::-webkit-date-and-time-value { text-align: left; margin: 0; }
+.leaflet-container .leaflet-bar { border: 0; border-radius: 12px; overflow: hidden; box-shadow: none; }
+.leaflet-container .leaflet-bar a { background: hsl(var(--card)); color: hsl(var(--foreground)); border-bottom-color: hsl(var(--border)); }
+.leaflet-container .leaflet-bar a:hover { background: hsl(var(--secondary)); }
+.leaflet-container .leaflet-control-attribution { background: hsl(var(--card) / 0.85); color: hsl(var(--muted-foreground)); }
+.leaflet-container .leaflet-control-attribution a { color: hsl(var(--brand-ink)); }

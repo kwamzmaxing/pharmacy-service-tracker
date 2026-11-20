@@ -53,7 +53,7 @@ New features sometimes need an updated `firestore.rules` (for example, receipt p
 
 ## Good to know
 
-- **Maps and distances**: the journey calculator uses free open services: postcodes.io for UK postcodes, OpenStreetMap for place names, OSRM for driving routes and CARTO map tiles. They need no set-up. If the route service is busy, the tracker falls back to a clearly marked estimate. For heavy use, switch to a paid routing service with your own key.
+- **Maps and distances**: the journey calculator uses free open services: postcodes.io for UK postcodes, OpenStreetMap for place names, OSRM for driving routes and OpenStreetMap map tiles. They need no set-up. If the route service is busy, the tracker falls back to a clearly marked estimate. For heavy use, switch to a paid routing service with your own key.
 
 - **Cost**: Firebase's free plan covers 50,000 reads and 20,000 writes a day, far more than this tracker needs.
 - **Privacy**: each person's tracker can only be read by them. The admin sees names, emails, log-in dates, feedback and emails sent through them, never anyone's invoices or passwords.
