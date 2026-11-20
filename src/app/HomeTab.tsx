@@ -1,6 +1,6 @@
 // Home: where things stand, what needs doing, and a way into every part of the tracker.
 import type { ReactNode } from "react"
-import { ArrowRight, Calculator, Car, Clock, FileText, Pill as PillIcon, Plus, Receipt, Settings, Store } from "lucide-react"
+import { ArrowRight, Calculator, Car, ChartPie, Clock, FileText, Pill as PillIcon, Plus, Receipt, Settings, Store } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { entryAmt, fmtDate, followUpsDue, invStatus, money, monthly, plural, qtyText, taxSummary, unitOf } from "@/lib/model"
 import { useApp, type Tab } from "./ctx"
@@ -56,6 +56,7 @@ export function HomeTab() {
     { tab: "invoices", icon: <FileText />, title: "Invoices", text: "Create, send, chase and mark as paid.", stat: open.length ? `${plural(open.length, "unpaid invoice")}` : "Nothing outstanding" },
     { tab: "expenses", icon: <Receipt />, title: "Expenses", text: "Costs and receipt photos, ready for your tax return.", stat: `${money(tax.expenses)} in ${tax.year.label}` },
     { tab: "tax", icon: <Calculator />, title: "Tax", text: "Income tax and National Insurance, estimated as you go.", stat: `About ${money(tax.total)} so far` },
+    { tab: "budget", icon: <ChartPie />, title: "Accounting", text: "Share out what comes in: tax, bills, savings and spending.", stat: data.budget.active === "custom" && data.budget.custom.length ? plural(data.budget.custom.length, "pot") + " in your split" : "Suggested split ready" },
     { tab: "clients", icon: <Store />, title: "Pharmacies", text: "Saved details and how quickly each one pays.", stat: plural(data.clients.length, "pharmacy", "pharmacies") + " saved" },
     { tab: "account", icon: <Settings />, title: "Settings", text: "Invoice details, Gmail, calendar, appearance.", stat: google.gmail === "ready" ? "Gmail connected" : "Gmail not connected" },
   ]
