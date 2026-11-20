@@ -457,10 +457,17 @@ export const daysToPay = (i: Invoice) => (i.status === "paid" && i.paidDate ? Ma
 const avg = (xs: number[]) => (xs.length ? Math.round(sum(xs) / xs.length) : null)
 
 export type MonthPoint = { ym: string; label: string; logged: number; paid: number }
-/** The last `n` months: what was logged (earned) and what was paid. */
+/**
+ * The last `n` months, by the month the work was done: what was logged (earned),
+ * and how much of that work has been paid for so far (whenever the money arrived).
+ */
 export function monthly(d: Data, n = 6): MonthPoint[] {
   const now = new Date()
   const out: MonthPoint[] = []
+  const paidIds = new Set(d.invoices.filter((i) => i.status === "paid").map((i) => i.id))
+  // Paid invoices whose entries are no longer in the log (e.g. older data) count in the month they were issued
+  const linked = new Set(d.entries.map((e) => e.invoiceId).filter(Boolean))
+  const unlinkedPaid = d.invoices.filter((i) => i.status === "paid" && !linked.has(i.id))
   for (let k = n - 1; k >= 0; k--) {
     const m = new Date(now.getFullYear(), now.getMonth() - k, 1)
     const ym = `${m.getFullYear()}-${String(m.getMonth() + 1).padStart(2, "0")}`
@@ -468,7 +475,9 @@ export function monthly(d: Data, n = 6): MonthPoint[] {
       ym,
       label: m.toLocaleDateString("en-GB", { month: "short" }),
       logged: sum(d.entries.filter((e) => ymOf(e.date) === ym).map(entryAmt)),
-      paid: sum(d.invoices.filter((i) => i.status === "paid" && i.paidDate && ymOf(i.paidDate) === ym).map((i) => i.total)),
+      paid:
+        sum(d.entries.filter((e) => ymOf(e.date) === ym && e.invoiceId && paidIds.has(e.invoiceId)).map(entryAmt)) +
+        sum(unlinkedPaid.filter((i) => ymOf(i.issued) === ym).map((i) => i.total)),
     })
   }
   return out

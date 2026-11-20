@@ -107,7 +107,7 @@ export function InvoicesTab() {
         </Panel>
       )}
 
-      <Panel title="Last six months">
+      <Panel title="Last six months" aside="By the month you did the work">
         <MonthlyBars points={series} />
       </Panel>
 
