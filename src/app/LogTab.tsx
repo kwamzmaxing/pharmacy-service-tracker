@@ -12,9 +12,9 @@ import { cn } from "@/lib/utils"
 const hoursService = (d: Data) => d.services.find((s) => /hour/i.test(s.name))
 
 export function LogTab() {
-  const { data, commit, ask } = useApp()
+  const { data, commit, ask, logMode } = useApp()
   const [editingId, setEditingId] = useState<string | null>(null)
-  const [mode, setMode] = useState<"service" | "hours" | "journey">("service")
+  const [mode, setMode] = useState<"service" | "hours" | "journey">(logMode)
   const editing = editingId ? data.entries.find((e) => e.id === editingId) : undefined
 
   const lastClient = (data.meta.lastClientId as string | undefined) ?? ""

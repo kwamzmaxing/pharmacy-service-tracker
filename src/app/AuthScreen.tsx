@@ -157,7 +157,7 @@ export function AuthScreen({ notice }: { notice?: string }) {
             {mode === "in" && <button type="button" className="font-semibold text-brand-ink hover:underline" onClick={() => { setMode("forgot"); setInfo("") }}>Forgot password?</button>}
             {mode === "forgot" && <button type="button" className="font-semibold text-brand-ink hover:underline" onClick={() => setMode("in")}>Back to log in</button>}
           </div>
-          <p className="mt-4 text-[12px] leading-relaxed text-muted-foreground">Your account works on any phone or computer. Only you can see your entries and invoices.</p>
+          <p className="mt-4 text-[12px] leading-relaxed text-muted-foreground">Your account works on any phone or computer. Only you can see your entries and invoices. <a href={`${import.meta.env.BASE_URL}privacy.html`} className="font-medium text-brand-ink hover:underline">Privacy policy</a></p>
         </div>
       </div>
     </div>

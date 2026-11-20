@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { toast } from "sonner"
 import { onAuthStateChanged, signOut, type User } from "firebase/auth"
-import { LogOut, MessageSquare, Monitor, Moon, Sun, UserRound } from "lucide-react"
+import { House, LogOut, MessageSquare, Monitor, Moon, Sun, UserRound } from "lucide-react"
 import { Toaster } from "@/components/ui/sonner"
 import { Button } from "@/components/ui/button"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuRadioGroup, DropdownMenuRadioItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
@@ -12,10 +12,11 @@ import { auth } from "@/lib/firebase"
 import { followUpsDue, initials, newData, type Data } from "@/lib/model"
 import { getSettings, isAdmin as checkAdmin, myOutbox, openVault, recordPerson, type OutboxItem, type PublicSettings, type SaveProblem, type Vault } from "@/lib/cloud"
 import { disconnect, GOOGLE_HELP, GoogleError, status as googleStatus, token as googleToken, type ConnStatus, type GoogleArea } from "@/lib/google"
-import { AppCtx, type AppApi, type AskOptions, type EmailKind, type Me, type Tab } from "@/app/ctx"
+import { AppCtx, type AppApi, type AskOptions, type EmailKind, type LogMode, type Me, type Tab } from "@/app/ctx"
 import { ConfirmDialog, EmailDialog, FeedbackDialog, FollowUpDialog, InvoiceDialog } from "@/app/dialogs"
 import { AuthScreen } from "@/app/AuthScreen"
 import { LogTab } from "@/app/LogTab"
+import { HomeTab } from "@/app/HomeTab"
 import { SummaryTab } from "@/app/SummaryTab"
 import { InvoicesTab } from "@/app/InvoicesTab"
 import { ServicesTab } from "@/app/ServicesTab"
@@ -25,7 +26,7 @@ import { ExpensesTab } from "@/app/ExpensesTab"
 import { TaxTab } from "@/app/TaxTab"
 import { AdminTab, processOutbox } from "@/app/AdminTab"
 
-const BASE_TABS: [Tab, string][] = [["log", "Log"], ["invoices", "Invoices"], ["expenses", "Expenses"], ["tax", "Tax"], ["clients", "Pharmacies"], ["account", "Settings"]]
+const BASE_TABS: [Tab, string][] = [["home", "Home"], ["log", "Log"], ["invoices", "Invoices"], ["expenses", "Expenses"], ["tax", "Tax"], ["clients", "Pharmacies"], ["account", "Settings"]]
 /** Pages without their own tab light up the tab they belong to. */
 const SECTION: Partial<Record<Tab, Tab>> = { summary: "invoices", services: "account" }
 const PROBLEM_TEXT: Record<SaveProblem, string> = {
@@ -56,6 +57,22 @@ function Splash({ message, children }: { message: string; children?: React.React
   )
 }
 
+export const PRIVACY_URL = `${import.meta.env.BASE_URL}privacy.html`
+
+function SiteFooter({ onFeedback, onHome }: { onFeedback: () => void; onHome: () => void }) {
+  const link = "rounded hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+  return (
+    <footer className="wrap mt-14 flex flex-wrap items-center justify-between gap-x-6 gap-y-2 border-t border-border/60 pt-6 text-[12.5px] text-muted-foreground">
+      <span>Service Tracker · for UK locum pharmacists</span>
+      <nav aria-label="Site" className="flex flex-wrap gap-x-5 gap-y-1">
+        <button type="button" className={link} onClick={onHome}>Home</button>
+        <a className={link} href={PRIVACY_URL} target="_blank" rel="noopener">Privacy policy</a>
+        <button type="button" className={link} onClick={onFeedback}>Send feedback</button>
+      </nav>
+    </footer>
+  )
+}
+
 const meFrom = (u: User): Me => ({
   uid: u.uid,
   email: u.email || "",
@@ -69,7 +86,8 @@ export default function App() {
   const [data, setData] = useState<Data | null>(null)
   const [phase, setPhase] = useState<"starting" | "auth" | "loading" | "ready" | "error">("starting")
   const [authNotice, setAuthNotice] = useState("")
-  const [tab, setTab] = useState<Tab>("log")
+  const [tab, setTab] = useState<Tab>("home")
+  const [logMode, setLogMode] = useState<LogMode>("service")
   const [invoiceView, setInvoiceView] = useState<{ id: string; justCreated: boolean } | null>(null)
   const [emailReq, setEmailReq] = useState<{ id: string; kind: EmailKind; fromFollowUps: boolean } | null>(null)
   const [followOpen, setFollowOpen] = useState(false)
@@ -131,7 +149,7 @@ export default function App() {
     dataRef.current = d
     setData(d)
     setMe(m)
-    setTab(isNew ? "account" : "log")
+    setTab(isNew ? "account" : "home")
     setPhase("ready")
     if (isNew) toast("Welcome. Add your invoice details to get started.")
     if (followUpsDue(d).length) setTimeout(() => setFollowOpen(true), 400)
@@ -202,7 +220,7 @@ export default function App() {
     vaultRef.current.save(d)
     if (message) toast(message)
   }, [])
-  const go = useCallback((t: Tab) => { setTab(t); setClientView(null); window.scrollTo({ top: 0 }) }, [])
+  const go = useCallback((t: Tab, mode: LogMode = "service") => { setLogMode(mode); setTab(t); setClientView(null); window.scrollTo({ top: 0 }) }, [])
   const leave = useCallback(async (notice: string) => {
     setInvoiceView(null); setEmailReq(null); setFollowOpen(false); setFeedbackOpen(false); setOutbox([])
     disconnect()
@@ -226,7 +244,7 @@ export default function App() {
   const api = useMemo<AppApi | null>(() => {
     if (!data || !me) return null
     return {
-      data, me, commit, replaceAll, ask, go, google, connect, isAdmin: admin, settings, setSettings, outbox, refreshOutbox, theme, setTheme,
+      data, me, commit, replaceAll, ask, go, google, connect, isAdmin: admin, settings, setSettings, outbox, refreshOutbox, theme, setTheme, logMode,
       disconnectGoogle: () => { disconnect(); refreshGoogle(); toast("Google disconnected on this device") },
       viewInvoice: (id, justCreated = false) => setInvoiceView({ id, justCreated }),
       openClient: (id) => { setClientView(id); setTab("clients"); window.scrollTo({ top: 0 }) },
@@ -237,7 +255,7 @@ export default function App() {
       logOut: () => leave("You’ve logged out."),
       accountDeleted: () => leave("Your account was deleted."),
     }
-  }, [data, me, commit, replaceAll, ask, go, google, connect, admin, settings, outbox, refreshOutbox, leave, clientView, theme, setTheme])
+  }, [data, me, commit, replaceAll, ask, go, google, connect, admin, settings, outbox, refreshOutbox, leave, clientView, theme, setTheme, logMode])
 
   const confirm = <ConfirmDialog req={askReq} onDone={(ok) => { askResolve.current?.(ok); askResolve.current = null; setAskReq(null) }} />
   const toaster = <Toaster theme={resolvedTheme} position="bottom-center" toastOptions={{ style: { fontFamily: "Inter, system-ui, sans-serif", borderRadius: 14 } }} />
@@ -259,10 +277,10 @@ export default function App() {
         <header className="sticky top-[env(safe-area-inset-top,0px)] z-40 bg-background/90 backdrop-blur-md supports-[backdrop-filter]:bg-background/75">
           <div className="wrap">
             <div className="flex items-center justify-between gap-3 pb-3 pt-4">
-              <div className="flex min-w-0 items-center gap-3">
+              <button type="button" onClick={() => go("home")} aria-label="Service Tracker home" className="flex min-w-0 items-center gap-3 rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
                 <Mark />
                 <h1 className="font-display text-[17px] font-medium">Service Tracker</h1>
-              </div>
+              </button>
               <DropdownMenu>
                 <DropdownMenuTrigger aria-label="Account menu" className="flex min-w-0 items-center gap-2 rounded-full py-1 pl-3.5 pr-1 text-[13.5px] text-muted-foreground hover:bg-secondary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
                   <span className="hidden max-w-[180px] truncate sm:inline">{name}</span>
@@ -274,6 +292,7 @@ export default function App() {
                     <div className="truncate text-xs text-muted-foreground">{me.email}</div>
                   </DropdownMenuLabel>
                   <DropdownMenuSeparator />
+                  <DropdownMenuItem onSelect={() => go("home")}><House /> Home</DropdownMenuItem>
                   <DropdownMenuItem onSelect={() => go("account")}><UserRound /> Settings</DropdownMenuItem>
                   <DropdownMenuItem onSelect={() => setFeedbackOpen(true)}><MessageSquare /> Send feedback</DropdownMenuItem>
                   <DropdownMenuSeparator />
@@ -309,6 +328,7 @@ export default function App() {
         </header>
 
         <main className="wrap pt-4">
+          {tab === "home" && <HomeTab />}
           {tab === "log" && <LogTab />}
           {tab === "summary" && <SummaryTab />}
           {tab === "invoices" && <InvoicesTab />}
@@ -319,6 +339,7 @@ export default function App() {
           {tab === "account" && <AccountTab />}
           {tab === "admin" && admin && <AdminTab />}
         </main>
+        <SiteFooter onFeedback={() => setFeedbackOpen(true)} onHome={() => go("home")} />
       </div>
 
       <InvoiceDialog id={invoiceView?.id ?? null} justCreated={!!invoiceView?.justCreated} onClose={() => setInvoiceView(null)} />

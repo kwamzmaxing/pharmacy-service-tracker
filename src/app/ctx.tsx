@@ -4,7 +4,8 @@ import type { OutboxItem, PublicSettings } from "@/lib/cloud"
 import type { ConnStatus, GoogleArea } from "@/lib/google"
 import type { ThemePref } from "@/lib/theme"
 
-export type Tab = "log" | "summary" | "invoices" | "expenses" | "tax" | "clients" | "services" | "account" | "admin"
+export type Tab = "home" | "log" | "summary" | "invoices" | "expenses" | "tax" | "clients" | "services" | "account" | "admin"
+export type LogMode = "service" | "hours" | "journey"
 export type EmailKind = "invoice" | "followup"
 export type Me = { uid: string; email: string; name: string; emailVerified: boolean; viaGoogle: boolean }
 
@@ -24,7 +25,9 @@ export type AppApi = {
   commit: (fn: (d: Data) => void, message?: string) => void
   replaceAll: (d: Data, message?: string) => void
   ask: (o: AskOptions) => Promise<boolean>
-  go: (t: Tab) => void
+  /** Open a section; for the log, optionally which form to start on. */
+  go: (t: Tab, logMode?: LogMode) => void
+  logMode: LogMode
   viewInvoice: (id: string, justCreated?: boolean) => void
   /** Open a pharmacy's profile on the Pharmacies tab. */
   openClient: (id: string) => void

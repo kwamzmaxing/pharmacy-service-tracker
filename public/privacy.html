@@ -1,0 +1,149 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+<meta charset="UTF-8" />
+<script>
+  try { var t = localStorage.getItem("pst_theme") || "dark"; if (t === "system") t = matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light"; document.documentElement.dataset.theme = t } catch (e) { document.documentElement.dataset.theme = "dark" }
+</script>
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Privacy policy · Service Tracker</title>
+<meta name="description" content="How Service Tracker collects, uses and protects your information." />
+<link rel="icon" href="favicon.svg" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@100..125,400..700&family=Inter:wght@400..700&display=swap" rel="stylesheet" />
+<style>
+  :root, [data-theme="light"] { --bg: #f1f1f5; --card: #ffffff; --fg: #171721; --muted: #5d5d6e; --line: #e2e2ea; --accent: #3a4fd6; }
+  [data-theme="dark"] { --bg: #171721; --card: #1e1e2a; --fg: #ececf3; --muted: #aeaeb8; --line: #2c2c3a; --accent: #a5b0f7; }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--fg); font: 15.5px/1.65 Inter, system-ui, sans-serif; -webkit-font-smoothing: antialiased; }
+  .wrap { max-width: 760px; margin: 0 auto; padding: 0 16px; }
+  header { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 20px 0; }
+  .brand { display: flex; align-items: center; gap: 12px; color: inherit; text-decoration: none; font-family: Archivo, Inter, sans-serif; font-stretch: 118%; font-weight: 500; font-size: 17px; }
+  .mark { display: flex; width: 36px; height: 36px; align-items: center; justify-content: center; border-radius: 9px; background: var(--card); font-size: 20px; }
+  .back { color: var(--muted); text-decoration: none; font-size: 14px; border-radius: 999px; padding: 8px 16px; background: var(--card); }
+  .back:hover { color: var(--fg); }
+  h1, h2 { font-family: Archivo, Inter, sans-serif; font-stretch: 118%; font-weight: 500; letter-spacing: .01em; line-height: 1.2; }
+  h1 { font-size: clamp(30px, 6vw, 44px); margin: 40px 0 8px; }
+  h2 { font-size: 19px; margin: 0 0 12px; }
+  .updated { color: var(--muted); font-size: 14px; margin: 0 0 32px; }
+  section { background: var(--card); border-radius: 16px; padding: 24px; margin-bottom: 12px; }
+  @media (min-width: 640px) { section { padding: 28px 32px; } }
+  p, li { margin: 0 0 10px; }
+  section > :last-child { margin-bottom: 0; }
+  ul { padding-left: 20px; margin: 0 0 10px; }
+  strong { font-weight: 600; }
+  a { color: var(--accent); }
+  .summary { font-size: 16.5px; }
+  table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  th, td { text-align: left; vertical-align: top; padding: 10px 12px 10px 0; border-top: 1px solid var(--line); }
+  th { color: var(--muted); font-weight: 500; font-size: 12.5px; border-top: 0; }
+  .scroll { overflow-x: auto; }
+  footer { color: var(--muted); font-size: 13px; padding: 28px 0 48px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <a class="brand" href="./"><span class="mark" aria-hidden="true">℞</span>Service Tracker</a>
+    <a class="back" href="./">Back to the tracker</a>
+  </header>
+
+  <h1>Privacy policy</h1>
+  <p class="updated">Last updated 20 November 2026</p>
+
+  <section>
+    <p class="summary"><strong>In short:</strong> your entries, invoices and expenses belong to you. Only you can see them. We use them only to run the tracker for you, we never sell them, and you can download or delete everything at any time.</p>
+  </section>
+
+  <section>
+    <h2>Who we are</h2>
+    <p>Service Tracker helps UK locum pharmacists log their work, invoice pharmacies and keep track of payments, expenses and tax. In this policy, “we” means the people who run Service Tracker. We are the data controller for the information described here.</p>
+  </section>
+
+  <section>
+    <h2>What we collect</h2>
+    <div class="scroll">
+    <table>
+      <tr><th>Information</th><th>Why</th></tr>
+      <tr><td><strong>Your account:</strong> name, email address, and when you signed up and last logged in</td><td>To log you in on any device, reset your password and contact you about your account</td></tr>
+      <tr><td><strong>Your tracker:</strong> services, hours and fees you log, invoices, the pharmacies you work for and their contact details, saved journeys, expenses and receipt photos</td><td>This is the tracker itself: we store it so you can use it on every device</td></tr>
+      <tr><td><strong>Invoice details:</strong> your trading name, address, phone, GPhC number, bank details and logo</td><td>To print them on the invoices you create</td></tr>
+      <tr><td><strong>Tax settings:</strong> your vehicle, whether you pay Scottish tax rates, and any salary you enter</td><td>To estimate your tax and mileage allowance</td></tr>
+      <tr><td><strong>Feedback</strong> you choose to send</td><td>To improve the tracker</td></tr>
+    </table>
+    </div>
+    <p>Passwords are handled by Google Firebase Authentication. We never see or store your password.</p>
+  </section>
+
+  <section>
+    <h2>Who can see your information</h2>
+    <ul>
+      <li><strong>Only you</strong> can see your entries, invoices, pharmacies, journeys, expenses and receipts. Security rules on our database stop anyone else, including us, from reading them through the tracker.</li>
+      <li>The <strong>site administrator</strong> can see your name, email address, and sign-up and last log-in dates, so they can help with account problems. They can also see feedback you send.</li>
+      <li>If you ask the tracker to <strong>send an invoice from the site’s email address</strong> instead of your own, that email, including the invoice PDF, is passed to the administrator to send for you.</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>Connecting your Google account</h2>
+    <p>Connecting Google is optional. You choose what to connect in Settings, and the tracker asks Google for permission each time:</p>
+    <ul>
+      <li><strong>Gmail:</strong> only to send the invoice and reminder emails you choose to send. The tracker cannot read your inbox.</li>
+      <li><strong>Google Calendar:</strong> only to add the payment due dates you ask for.</li>
+      <li><strong>Google Sheets (administrator only):</strong> to keep a sheet of account holders and feedback in the administrator’s own Google Drive. Only files the tracker creates can be reached.</li>
+    </ul>
+    <p>Google access is kept in your browser for the current visit only and is not stored on our servers. Service Tracker’s use of information received from Google APIs follows the <a href="https://developers.google.com/terms/api-services-user-data-policy" rel="noopener">Google API Services User Data Policy</a>, including the Limited Use requirements. We do not use Google data for advertising, do not sell it, and do not use it to train AI models.</p>
+    <p>You can disconnect at any time in Settings, or remove access from your <a href="https://myaccount.google.com/permissions" rel="noopener">Google account permissions</a>.</p>
+  </section>
+
+  <section>
+    <h2>Services we use</h2>
+    <ul>
+      <li><strong>Google Firebase</strong> stores your account and tracker data.</li>
+      <li><strong>GitHub Pages</strong> hosts the website.</li>
+      <li>When you work out a journey, the places you type are sent to <strong>postcodes.io</strong> and <strong>OpenStreetMap Nominatim</strong> to find them, and to <strong>OSRM</strong> to measure the driving route. Map images come from <strong>CARTO</strong>. These services do not receive your name or account details.</li>
+      <li><strong>Google Fonts</strong> supplies the typefaces.</li>
+    </ul>
+    <p>Some of these providers may process data outside the UK. Where they do, they use safeguards recognised under UK data protection law.</p>
+  </section>
+
+  <section>
+    <h2>Cookies and storage on your device</h2>
+    <p>We don’t use advertising or tracking cookies, and we don’t run analytics. Your browser keeps a few things so the tracker works: your log-in (if you chose “Keep me logged in”), an offline copy of your tracker so it loads quickly and works without signal, your light or dark mode choice, and which Google services you’ve connected.</p>
+  </section>
+
+  <section>
+    <h2>Our legal basis</h2>
+    <p>We use your information to provide the service you signed up for (performance of a contract). We handle feedback and account support because we have a legitimate interest in running and improving the tracker. Connecting Google is based on your consent, which you can withdraw at any time.</p>
+  </section>
+
+  <section>
+    <h2>How long we keep it</h2>
+    <p>We keep your information for as long as you have an account. When you delete your account in Settings, your entries, invoices, journeys, expenses, receipts and account record are deleted straight away. Feedback you sent and copies of emails sent through the administrator are kept until we delete them; ask and we will remove them. You may need to keep your own records for HMRC, so download them before you delete your account.</p>
+  </section>
+
+  <section>
+    <h2>Your rights</h2>
+    <p>Under UK data protection law you can ask to see, correct, delete or download the information we hold about you, and object to or restrict how we use it. You can do most of this yourself:</p>
+    <ul>
+      <li>Change your details in <strong>Settings</strong></li>
+      <li>Download your data in <strong>Settings → Your data</strong> (Excel or a back-up file)</li>
+      <li>Delete everything in <strong>Settings → Delete account</strong></li>
+    </ul>
+    <p>For anything else, use <strong>Send feedback</strong> in the tracker. If you’re unhappy with how we handle your information, you can complain to the <a href="https://ico.org.uk/make-a-complaint/" rel="noopener">Information Commissioner’s Office</a>.</p>
+  </section>
+
+  <section>
+    <h2>Keeping your information safe</h2>
+    <p>Data is encrypted in transit and stored with Google Firebase, which encrypts it at rest. Access is limited by database security rules. No system is completely secure, so please use a strong password that you don’t use elsewhere.</p>
+  </section>
+
+  <section>
+    <h2>Changes to this policy</h2>
+    <p>If we change this policy, we’ll update the date at the top. For significant changes, we’ll tell you in the tracker.</p>
+  </section>
+
+  <footer>Service Tracker · for UK locum pharmacists</footer>
+</div>
+</body>
+</html>

@@ -326,7 +326,7 @@ export function AccountTab() {
 
       <Panel title="Your data">
         <p className="mb-3 max-w-[62ch] text-[13px] text-muted-foreground">
-          Your tracker is saved online. A back-up file is an extra copy you keep yourself. Combine merges daily back-up files, including ones from the earlier claude.ai version, without counting an entry twice.
+          Your tracker is saved online. A back-up file is an extra copy you keep yourself. Combine merges daily back-up files, including ones from the earlier claude.ai version, without counting an entry twice. Read how your information is handled in the <a href={`${import.meta.env.BASE_URL}privacy.html`} target="_blank" rel="noopener" className="font-medium text-brand-ink hover:underline">privacy policy</a>.
         </p>
         <div className="flex flex-wrap gap-2">
           <Button onClick={excel}>Export to Excel</Button>
