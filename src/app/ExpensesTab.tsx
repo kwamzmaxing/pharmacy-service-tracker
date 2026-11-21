@@ -10,7 +10,7 @@ import { deleteReceipt, getReceipt, saveReceipt } from "@/lib/cloud"
 import { shrinkImage } from "@/lib/images"
 import { useApp } from "./ctx"
 import { Empty, Field, Ledger, MoneyField, Panel } from "./bits"
-import { EXPENSE_TIPS, GuideNote, Tips } from "./TaxGuide"
+import { EXPENSE_TIPS, GPHC_TIP, GuideNote, Tips } from "./TaxGuide"
 
 export function ExpensesTab() {
   const { data, commit, me, ask, go } = useApp()
@@ -126,7 +126,7 @@ export function ExpensesTab() {
       )}
 
       <Panel title="What can I claim?" aside="From GOV.UK">
-        <Tips tips={EXPENSE_TIPS} />
+        <Tips tips={[EXPENSE_TIPS[0], { ...GPHC_TIP, id: "gphc-fee-exp" }, ...EXPENSE_TIPS.slice(1)]} />
         <GuideNote />
       </Panel>
 

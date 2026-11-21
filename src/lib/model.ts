@@ -68,6 +68,8 @@ export type Profile = {
   taxBasis?: "cash" | "earned"
   /** Deduct real expenses and mileage, or the flat trading allowance instead ("auto" picks whichever means less tax). */
   deductionMethod?: DeductionMethod
+  /** Making Tax Digital update periods: "standard" (from 6 April) or "calendar" (from 1 April). */
+  mtdPeriods?: "standard" | "calendar"
 }
 export type Vehicle = "car" | "motorcycle" | "bicycle"
 /** A place used by the journey calculator. */
@@ -629,13 +631,13 @@ export const EXPENSE_CATEGORIES: [ExpenseCategory, string, string][] = [
   ["travel", "Travel", "Train, bus, tram and taxi fares, and parking"],
   ["accommodation", "Accommodation", "Hotels for shifts away from home"],
   ["subsistence", "Food on overnight trips", "Meals while staying away for work"],
-  ["fees", "Professional fees", "Professional memberships and journals for your work"],
+  ["fees", "Professional fees", "Memberships and journals for your locum work (with a PAYE job too, claim GPhC through your employment)"],
   ["insurance", "Indemnity insurance", "Professional indemnity cover"],
   ["training", "Training and CPD", "Courses that keep your current skills up to date"],
   ["phone", "Phone and internet", "The business share of your bills"],
-  ["equipment", "Equipment and stationery", "Stationery, printing, postage, uniforms (not everyday clothes)"],
-  ["accountancy", "Accountancy", "Accountant and software fees"],
-  ["other", "Other", "Anything else wholly for work"],
+  ["equipment", "Equipment and stationery", "Stationery, printing, postage, software and small office equipment"],
+  ["accountancy", "Accountancy", "Accountant’s fees"],
+  ["other", "Other", "Anything else wholly for work, such as uniforms (not everyday clothes)"],
 ]
 export const categoryName = (c: ExpenseCategory) => EXPENSE_CATEGORIES.find((x) => x[0] === c)?.[1] ?? "Other"
 
