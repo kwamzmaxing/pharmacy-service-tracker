@@ -58,6 +58,20 @@ export const PAYE: Tip[] = [
     sources: [["Working for yourself", `${G}/working-for-yourself`], ["Tax codes", `${G}/tax-codes/what-your-tax-code-means`], ["Income Tax rates", `${G}/income-tax-rates`], ["Self-employed National Insurance rates", `${G}/self-employed-national-insurance-rates`]],
   },
   {
+    id: "gphc-fee",
+    q: "Where do I claim my GPhC fee and indemnity insurance?",
+    a: <>
+      <p><b>If you have a PAYE job as well as locum work:</b> claim your GPhC registration fee as an <b>employment expense</b>, and your locum indemnity insurance as a <b>self-employed (locum) expense</b>. Claim each one once only, never in both places.</p>
+      <ul>
+        <li><b>GPhC fee:</b> the General Pharmaceutical Council is on HMRC’s list of approved professional bodies (List 3), and relief is due to pharmacists for staying on the register. As you file a Self Assessment return, you must claim it there (in the employment section) rather than on a separate claim form. It’s worth the fee times your tax rate: for example, a £293 fee at 20% is £58.60. Check the current fee with the GPhC.</li>
+        <li><b>Locum indemnity insurance:</b> add it on the Expenses tab as indemnity insurance. HMRC lists indemnity insurance premiums as a business expense.</li>
+      </ul>
+      <p>Why not put the GPhC fee against your locum income instead? It can look like it saves more, but self-employed costs must be <b>wholly and exclusively</b> for the business, and your registration also covers your employed job. That makes the employment route the clearer one. Royal Pharmaceutical Society membership is also on List 3.</p>
+      <p><b>If you only do locum work</b> (no PAYE job), your GPhC fee and memberships are business costs: add them on the Expenses tab under Professional fees.</p>
+    </>,
+    sources: [["HMRC List 3: approved professional bodies", `${G}/government/publications/professional-bodies-approved-for-tax-relief-list-3`], ["Tax relief for employees: professional fees", `${G}/tax-relief-for-employees/professional-fees-and-subscriptions`], ["Tax relief for employees: how much you get", `${G}/tax-relief-for-employees/overview`], ["Legal and financial costs (indemnity insurance)", `${G}/expenses-if-youre-self-employed/legal-financial`], ["HMRC manual: wholly and exclusively (BIM37000)", `${G}/hmrc-internal-manuals/business-income-manual/bim37000`]],
+  },
+  {
     id: "pay-through-code",
     q: "Can I pay my locum tax through my PAYE salary instead?",
     a: <>
@@ -140,7 +154,7 @@ export const EXPENSE_TIPS: Tip[] = [
       <p>Only costs for your work, for example:</p>
       <ul>
         <li>Professional indemnity insurance</li>
-        <li>Membership of a professional organisation related to your work, and professional journals</li>
+        <li>Membership of a professional organisation related to your work, and professional journals (if you also have a PAYE job, see “Where do I claim my GPhC fee and indemnity insurance?”)</li>
         <li>Training that keeps the skills you already use up to date (not training for a new line of business)</li>
         <li>The business share of your phone and internet bills</li>
         <li>Accountant’s fees</li>
@@ -218,3 +232,6 @@ export function GuideNote() {
     </p>
   )
 }
+
+/** The GPhC / indemnity tip, also shown on the Expenses page. */
+export const GPHC_TIP = PAYE.find((t) => t.id === "gphc-fee")!

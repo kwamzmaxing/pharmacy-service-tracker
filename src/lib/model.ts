@@ -631,7 +631,7 @@ export const EXPENSE_CATEGORIES: [ExpenseCategory, string, string][] = [
   ["travel", "Travel", "Train, bus, tram and taxi fares, and parking"],
   ["accommodation", "Accommodation", "Hotels for shifts away from home"],
   ["subsistence", "Food on overnight trips", "Meals while staying away for work"],
-  ["fees", "Professional fees", "Professional memberships and journals for your work"],
+  ["fees", "Professional fees", "Memberships and journals for your locum work (with a PAYE job too, claim GPhC through your employment)"],
   ["insurance", "Indemnity insurance", "Professional indemnity cover"],
   ["training", "Training and CPD", "Courses that keep your current skills up to date"],
   ["phone", "Phone and internet", "The business share of your bills"],
