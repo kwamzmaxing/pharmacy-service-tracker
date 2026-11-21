@@ -107,7 +107,7 @@ export function TaxTab() {
           <ul className="mt-2 divide-y border-t text-[14px]">
             <Row k={<button type="button" className="text-left hover:underline" onClick={() => go("budget")}>Rental income ({t.property.count})</button>} v={t.property.income} sub="Added on the Accounting tab" />
             <Row k="Property allowance" v={t.property.allowance} minus sub={`The first ${money(PROPERTY_ALLOWANCE)} is tax-free. Used instead of rental expenses, which aren’t recorded here.`} />
-            <Row k="Taxable rental profit" v={t.property.taxable} strong sub="Income tax only: no National Insurance on rent" />
+            <Row k="Taxable rental profit" v={t.property.taxable} strong sub="Income tax only: National Insurance on rent is voluntary, so it isn’t included" />
           </ul>
         )}
         <div className="mt-4 grid gap-4 sm:grid-cols-2">
@@ -233,7 +233,7 @@ export function TaxTab() {
       </Panel>
 
       <p className="px-1 text-[12px] leading-relaxed text-muted-foreground">
-        An estimate to help you plan, not financial or tax advice (<a href={`${import.meta.env.BASE_URL}privacy.html#disclaimer`} target="_blank" rel="noopener" className="underline underline-offset-2">disclaimer</a>). It uses {t.year.label} rates: personal allowance £12,570 (reduced above £100,000), Class 4 NI 6% on profits from £12,570 to £50,270 and 2% above, a {money(t.allowance)} trading allowance, and HMRC mileage of {pence(mileageRates("car", startYear).first)} a mile for the first 10,000 business miles by car ({pence(mileageRates("car", startYear).after)} after). Other self-employed work and rent added on the Accounting tab are included; rent uses the {money(PROPERTY_ALLOWANCE)} property allowance and has no NI. It leaves out student loans, pensions, savings interest, dividends, rental expenses and payments on account. Self Assessment for {t.year.label} is due online by 31 January {Number(t.year.to.slice(0, 4)) + 1}.
+        An estimate to help you plan, not financial or tax advice (<a href={`${import.meta.env.BASE_URL}privacy.html#disclaimer`} target="_blank" rel="noopener" className="underline underline-offset-2">disclaimer</a>). It uses 2026 to 2027 rates{startYear !== 2026 ? ` (applied to ${t.year.label} too, so treat it as a rough guide)` : ""}: personal allowance £12,570 (reduced above £100,000), Class 4 NI 6% on profits from £12,570 to £50,270 and 2% above, a {money(t.allowance)} trading allowance, and HMRC mileage of {pence(mileageRates("car", startYear).first)} a mile for the first 10,000 business miles by car ({pence(mileageRates("car", startYear).after)} after). Other self-employed work and rent added on the Accounting tab are included; rent uses the {money(PROPERTY_ALLOWANCE)} property allowance and no National Insurance (it’s voluntary on rent). It leaves out student loans, pensions, savings interest, dividends, rental expenses and payments on account. Self Assessment for {t.year.label} is due online by 31 January {Number(t.year.to.slice(0, 4)) + 1}.
       </p>
     </div>
   )

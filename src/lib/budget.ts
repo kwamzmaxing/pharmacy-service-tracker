@@ -160,10 +160,10 @@ export function suggest(d: Data, m: MoneyIn): Suggestion {
     for (const [k, v] of Object.entries(w) as [PotKind, number][]) amounts[k] = (amounts[k] || 0) + (left * v) / wTotal
     const monthsCovered = num(b.essentials) ? 3 * num(b.essentials) : 0
     why.emergency = monthsCovered
-      ? `Build up 3 to 6 months of essentials (${money(monthsCovered)} to ${money(monthsCovered * 2)}) for quiet weeks or late payers. Keep it in an easy-access savings account.`
-      : "A cushion for quiet weeks or late payers. Aim for 3 to 6 months of essentials in an easy-access account."
+      ? `A cushion for quiet weeks or late payers. MoneyHelper suggests 3 to 6 months of essential outgoings (${money(monthsCovered)} to ${money(monthsCovered * 2)} for you), in an easy-access account.`
+      : "A cushion for quiet weeks or late payers. MoneyHelper suggests 3 to 6 months of essential outgoings, in an easy-access account."
     why.savings = "For goals in the next few years: a holiday, a car, a house deposit."
-    why.invest = "As a locum there’s no employer pension, so this is yours to build. A personal pension or SIPP gets tax relief, and a Stocks & Shares ISA is tax-free."
+    why.invest = "Self-employed work doesn’t come with a workplace pension, so this is yours to build. Personal pensions get tax relief, and ISA interest, income and gains aren’t taxed. A guide, not financial advice."
     why.spending = "Guilt-free money for everything else."
     if (style === "debt") why.debt = "Your minimum repayments plus extra, highest interest rate first."
   }

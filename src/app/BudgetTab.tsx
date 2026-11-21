@@ -313,7 +313,7 @@ function OtherIncomePanel({ incomes, setB, ask }: {
           {TAX_TAB_KINDS.includes(form.kind) ? (
             <p className="text-[13px] text-muted-foreground">
               {form.kind === "rental"
-                ? "Counted on the Tax tab: income tax after the £1,000 property allowance, no National Insurance. Your tax pot includes it."
+                ? "Counted on the Tax tab: income tax after the £1,000 property allowance. National Insurance on rent is voluntary, so it isn’t included. Your tax pot includes it."
                 : "Counted on the Tax tab with your invoices, for income tax and National Insurance. Your tax pot includes it."}
             </p>
           ) : (
