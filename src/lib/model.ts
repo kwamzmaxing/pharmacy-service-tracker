@@ -626,27 +626,29 @@ export function insights(d: Data): Insight[] {
 
 /* ---------- expenses ---------- */
 export const EXPENSE_CATEGORIES: [ExpenseCategory, string, string][] = [
-  ["travel", "Travel", "Train, bus, taxi, parking and tolls"],
+  ["travel", "Travel", "Train, bus, tram and taxi fares, and parking"],
   ["accommodation", "Accommodation", "Hotels for shifts away from home"],
   ["subsistence", "Food on overnight trips", "Meals while staying away for work"],
-  ["fees", "Professional fees", "GPhC, RPS and other memberships"],
+  ["fees", "Professional fees", "Professional memberships and journals for your work"],
   ["insurance", "Indemnity insurance", "Professional indemnity cover"],
-  ["training", "Training and CPD", "Courses, exams and books for your role"],
+  ["training", "Training and CPD", "Courses that keep your current skills up to date"],
   ["phone", "Phone and internet", "The business share of your bills"],
-  ["equipment", "Equipment and stationery", "Tools, uniform, printing and postage"],
+  ["equipment", "Equipment and stationery", "Stationery, printing, postage, uniforms (not everyday clothes)"],
   ["accountancy", "Accountancy", "Accountant and software fees"],
   ["other", "Other", "Anything else wholly for work"],
 ]
 export const categoryName = (c: ExpenseCategory) => EXPENSE_CATEGORIES.find((x) => x[0] === c)?.[1] ?? "Other"
 
 /* ---------- mileage (HMRC simplified rates) ---------- */
-export const VEHICLES: [Vehicle, string][] = [["car", "Car or van"], ["motorcycle", "Motorcycle"], ["bicycle", "Bicycle"]]
+export const VEHICLES: [Vehicle, string][] = [["car", "Car or van"], ["motorcycle", "Motorcycle"], ["bicycle", "Bicycle (no flat mileage rate)"]]
 /** HMRC approved mileage rates for a tax year (first 10,000 business miles, then the rest). */
 export function mileageRates(vehicle: Vehicle, taxYearStart: number) {
   if (vehicle === "motorcycle") return { first: 0.24, after: 0.24 }
-  if (vehicle === "bicycle") return { first: 0.2, after: 0.2 }
-  // Autumn Budget 2026: miles over 10,000 rise from 25p to 35p from April 2027
-  return { first: taxYearStart >= 2026 ? 0.55 : 0.45, after: taxYearStart >= 2027 ? 0.35 : 0.25 }
+  // HMRC's flat (simplified expenses) rates cover cars, goods vehicles and motorcycles, not bicycles:
+  // bike costs are claimed as expenses or capital allowances instead
+  if (vehicle === "bicycle") return { first: 0, after: 0 }
+  // 55p from 6 April 2026 (45p before); 25p after 10,000 miles (gov.uk/simpler-income-tax-simplified-expenses/vehicles)
+  return { first: taxYearStart >= 2026 ? 0.55 : 0.45, after: 0.25 }
 }
 
 /**

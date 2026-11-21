@@ -10,6 +10,8 @@ import { categoryName, fmtDate, mileageRates, money, PROPERTY_ALLOWANCE, taxSumm
 import { saveFile } from "@/lib/store"
 import { useApp } from "./ctx"
 import { Chips, Ledger, MoneyField, Panel } from "./bits"
+import { BASICS, DATES, EXPENSE_TIPS, GuideNote, HELP, PAYE, Tips } from "./TaxGuide"
+import { ExternalLink } from "lucide-react"
 
 const pence = (n: number) => `${Math.round(n * 100)}p`
 
@@ -95,7 +97,7 @@ export function TaxTab() {
           <Row k={<button type="button" className="text-left hover:underline" onClick={() => go("expenses")}>Allowable expenses</button>} v={t.expenses} minus
             sub={t.byCategory.length ? t.byCategory.slice(0, 3).map((c) => `${categoryName(c.category)} ${money(c.amount)}`).join(" · ") + (t.byCategory.length > 3 ? " · …" : "") : "None recorded yet"} />
           <Row k="Mileage allowance" v={t.mileage.amount} minus
-            sub={!t.miles ? "No mileage logged in this tax year" : t.mileage.after
+            sub={!t.miles ? "No mileage logged in this tax year" : (p.vehicle || "car") === "bicycle" ? "HMRC’s flat mileage rates don’t cover bicycles: add bike costs as expenses instead" : t.mileage.after
               ? `${Math.round(t.miles * 10) / 10} business miles: 10,000 at ${pence(rates.first)}, ${(Math.round(t.mileage.after * 10) / 10).toLocaleString("en-GB")} at ${pence(rates.after)}`
               : `${Math.round(t.miles * 10) / 10} business miles at ${pence(rates.first)} a mile`} />
           </>}
@@ -133,7 +135,7 @@ export function TaxTab() {
         </div>
         {t.total > 1000 && (
           <p className="mt-3 rounded-md bg-secondary px-3 py-2.5 text-[12.5px] text-muted-foreground">
-            With a bill over £1,000, HMRC usually also asks for <b className="text-foreground">payments on account</b>: two advance payments towards next year, each half of this year’s bill, due 31 January and 31 July.
+            With a bill of £1,000 or more, you’ll usually also make <b className="text-foreground">payments on account</b>: two advance payments towards next year, each usually half of this year’s bill, due 31 January and 31 July (not needed if more than 80% of your tax was already paid another way, for example through your tax code). <a href="https://www.gov.uk/understand-self-assessment-bill/payments-on-account" target="_blank" rel="noopener noreferrer" className="font-medium text-brand-ink hover:underline">GOV.UK</a>
           </p>
         )}
       </Panel>
@@ -180,8 +182,26 @@ export function TaxTab() {
             options={[["auto", "Whichever is less tax"], ["expenses", "My expenses"], ["allowance", "Trading allowance"]]} />
         </div>
         <p className="mt-3 text-[12px] leading-relaxed text-muted-foreground">
-          You choose when you file your Self Assessment, and you can choose differently each year. With the allowance you can’t also claim mileage or other costs. If your self-employed income is under the allowance, it’s tax-free. It can’t be used on income from a business you own or are a partner in, or from your employer. A guide, not financial advice.
+          You choose when you file your Self Assessment, and you can choose differently each year. With the allowance you can’t also claim mileage or other costs. If your gross self-employed income is £1,000 or less, it’s tax-free. You can’t use the allowance in a year where any trading income comes from your employer (or your spouse’s or civil partner’s), or from a company or partnership you or someone connected to you owns, controls or is a partner in.{" "}
+          <a href="https://www.gov.uk/guidance/tax-free-allowances-on-property-and-trading-income" target="_blank" rel="noopener noreferrer" className="font-medium text-brand-ink hover:underline">GOV.UK</a> · <a href="https://www.gov.uk/government/publications/income-tax-increasing-the-trading-allowance" target="_blank" rel="noopener noreferrer" className="font-medium text-brand-ink hover:underline">£3,000 from April 2027</a>. A guide, not financial advice.
         </p>
+      </Panel>
+
+      <Panel title="Understanding your tax" aside="Tips for locum pharmacists">
+        <p className="mb-2 max-w-[64ch] text-[13px] text-muted-foreground">Short answers to common questions, each taken from GOV.UK with a link to check it yourself. Tap a question to open it.</p>
+        <h3 className="mt-3 text-[11px] font-bold uppercase tracking-[0.08em] text-muted-foreground">The basics</h3>
+        <Tips tips={BASICS} />
+        <h3 className="mt-4 text-[11px] font-bold uppercase tracking-[0.08em] text-muted-foreground">Locum work alongside a PAYE job</h3>
+        <Tips tips={PAYE} />
+        <h3 className="mt-4 text-[11px] font-bold uppercase tracking-[0.08em] text-muted-foreground">Dates and payments</h3>
+        <Tips tips={DATES} />
+        <h3 className="mt-4 text-[11px] font-bold uppercase tracking-[0.08em] text-muted-foreground">Expenses and travel</h3>
+        <Tips tips={EXPENSE_TIPS} />
+        <h3 className="mt-4 text-[11px] font-bold uppercase tracking-[0.08em] text-muted-foreground">HMRC tools</h3>
+        <ul className="mt-2 grid gap-1.5 text-[13.5px]">
+          {HELP.map(([l, u]) => <li key={u}><a href={u} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 font-medium text-brand-ink hover:underline">{l}<ExternalLink className="size-3" aria-hidden /></a></li>)}
+        </ul>
+        <GuideNote />
       </Panel>
 
       <Panel title="Your tax settings">
@@ -201,6 +221,7 @@ export function TaxTab() {
             <div className="grid gap-1.5">
             <MoneyField key={"oi" + (p.otherIncome ?? 0)} id="t-other" label="Yearly salary from an employed job (if any)" defaultValue={p.otherIncome || ""} placeholder="0"
               onBlur={(e) => { const v = Math.max(0, parseFloat(e.target.value) || 0); if (v !== (p.otherIncome || 0)) set("otherIncome", v) }} />
+            <a href="#tip-paye-and-locum" onClick={() => { const d = document.getElementById("tip-paye-and-locum") as HTMLDetailsElement | null; if (d) d.open = true }} className="text-[12.5px] font-medium text-brand-ink hover:underline">How a PAYE job and locum work are taxed together</a>
             {salaryLogged && <p className="text-[12.5px] text-warn">You’ve added salary on the Accounting tab. Put your yearly salary before tax here so your tax bands are right.</p>}
             </div>
           </div>

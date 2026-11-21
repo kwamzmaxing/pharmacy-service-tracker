@@ -188,7 +188,7 @@ export function JourneyForm() {
             <Button className="h-11 px-6" onClick={addToLog}>Add {plural(total, "mile")} to log</Button>
             <Button variant="ghost" className="h-11" onClick={() => setResult(null)}>Change journey</Button>
           </div>
-          <p className="text-[12px] text-muted-foreground">Adding saves this journey, so next time it’s one tap. The miles go on your next invoice to that pharmacy, and count towards your HMRC mileage allowance on the Tax tab.</p>
+          <p className="text-[12px] text-muted-foreground">Adding saves this journey, so next time it’s one tap. The miles go on your next invoice to that pharmacy, and count towards your HMRC mileage allowance on the Tax tab. Whether travel from home can be claimed depends on how you work: see “Can I claim travel to the pharmacies I work at?” under Expenses.</p>
         </div>
       )}
 
