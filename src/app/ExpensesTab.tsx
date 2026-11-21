@@ -5,14 +5,15 @@ import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
-import { categoryName, EXPENSE_CATEGORIES, fmtDate, money, monthLabel, plural, taxYear, taxYearsWithData, today, uid, type Expense, type ExpenseCategory } from "@/lib/model"
+import { categoryName, EXPENSE_CATEGORIES, fmtDate, money, monthLabel, plural, taxYear, taxYearsWithData, today, uid, taxSummary, tradingAllowance, type Expense, type ExpenseCategory } from "@/lib/model"
 import { deleteReceipt, getReceipt, saveReceipt } from "@/lib/cloud"
 import { shrinkImage } from "@/lib/images"
 import { useApp } from "./ctx"
 import { Empty, Field, Ledger, MoneyField, Panel } from "./bits"
+import { EXPENSE_TIPS, GuideNote, Tips } from "./TaxGuide"
 
 export function ExpensesTab() {
-  const { data, commit, me, ask } = useApp()
+  const { data, commit, me, ask, go } = useApp()
   const years = taxYearsWithData(data)
   const [yearFrom, setYearFrom] = useState(years[0].from)
   const ty = years.find((y) => y.from === yearFrom) ?? taxYear()
@@ -86,6 +87,28 @@ export function ExpensesTab() {
         { label: "Biggest category", value: byCat[0] ? byCat[0].name : "—", sub: byCat[0] ? money(byCat[0].amount) : "Nothing yet" },
       ]} />
 
+      {(() => {
+        // Are real costs worth claiming, or is the flat trading allowance better?
+        const t = taxSummary(data, yearFrom)
+        const costs = t.expenses + t.mileage.amount
+        const saving = Math.abs(t.compare.allowance.total - t.compare.expenses.total)
+        const next = tradingAllowance(Number(t.year.from.slice(0, 4)) + 1)
+        if (!t.income && !costs) return null
+        return (
+          <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl bg-card px-5 py-4 text-[13.5px]">
+            <p className="min-w-0 max-w-[60ch]">
+              <b className="font-medium">Expenses or the {money(t.allowance)} trading allowance?</b>{" "}
+              <span className="text-muted-foreground">
+                Your expenses and mileage come to {money(costs)} in {t.year.label}.{" "}
+                {saving < 1 ? "Either way the tax is about the same." : t.compare.expenses.total <= t.compare.allowance.total ? `Claiming them saves about ${money(saving)} in tax.` : `The flat allowance would save about ${money(saving)} instead.`}
+                {next > t.allowance && ` The allowance rises to ${money(next)} from 6 April 2027.`} A guide, not financial advice.
+              </span>
+            </p>
+            <Button size="sm" variant="outline" onClick={() => go("tax")}>Compare on Tax</Button>
+          </div>
+        )
+      })()}
+
       {adding && <ExpenseForm onDone={() => setAdding(false)} />}
 
       {byCat.length > 0 && (
@@ -102,6 +125,11 @@ export function ExpensesTab() {
         </Panel>
       )}
 
+      <Panel title="What can I claim?" aside="From GOV.UK">
+        <Tips tips={EXPENSE_TIPS} />
+        <GuideNote />
+      </Panel>
+
       <Panel title="Expenses">
         {!groups.length ? (
           <Empty title="No expenses in this tax year">
@@ -109,7 +137,7 @@ export function ExpensesTab() {
             {!adding && <div className="mt-3"><Button size="sm" onClick={() => setAdding(true)}><Plus /> Add expense</Button></div>}
           </Empty>
         ) : (
-          <div className="grid gap-4">
+          <div className="grid grid-cols-[minmax(0,1fr)] gap-4">
             {groups.map((g) => (
               <div key={g.ym}>
                 <div className="flex items-baseline justify-between border-b pb-1.5">

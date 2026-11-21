@@ -66,6 +66,8 @@ export type Profile = {
   otherIncome?: number
   /** Count income when it's paid (cash basis, HMRC's default) or when the work was done. */
   taxBasis?: "cash" | "earned"
+  /** Deduct real expenses and mileage, or the flat trading allowance instead ("auto" picks whichever means less tax). */
+  deductionMethod?: DeductionMethod
 }
 export type Vehicle = "car" | "motorcycle" | "bicycle"
 /** A place used by the journey calculator. */
@@ -624,27 +626,38 @@ export function insights(d: Data): Insight[] {
 
 /* ---------- expenses ---------- */
 export const EXPENSE_CATEGORIES: [ExpenseCategory, string, string][] = [
-  ["travel", "Travel", "Train, bus, taxi, parking and tolls"],
+  ["travel", "Travel", "Train, bus, tram and taxi fares, and parking"],
   ["accommodation", "Accommodation", "Hotels for shifts away from home"],
   ["subsistence", "Food on overnight trips", "Meals while staying away for work"],
-  ["fees", "Professional fees", "GPhC, RPS and other memberships"],
+  ["fees", "Professional fees", "Professional memberships and journals for your work"],
   ["insurance", "Indemnity insurance", "Professional indemnity cover"],
-  ["training", "Training and CPD", "Courses, exams and books for your role"],
+  ["training", "Training and CPD", "Courses that keep your current skills up to date"],
   ["phone", "Phone and internet", "The business share of your bills"],
-  ["equipment", "Equipment and stationery", "Tools, uniform, printing and postage"],
+  ["equipment", "Equipment and stationery", "Stationery, printing, postage, uniforms (not everyday clothes)"],
   ["accountancy", "Accountancy", "Accountant and software fees"],
   ["other", "Other", "Anything else wholly for work"],
 ]
 export const categoryName = (c: ExpenseCategory) => EXPENSE_CATEGORIES.find((x) => x[0] === c)?.[1] ?? "Other"
 
 /* ---------- mileage (HMRC simplified rates) ---------- */
-export const VEHICLES: [Vehicle, string][] = [["car", "Car or van"], ["motorcycle", "Motorcycle"], ["bicycle", "Bicycle"]]
+export const VEHICLES: [Vehicle, string][] = [["car", "Car or van"], ["motorcycle", "Motorcycle"], ["bicycle", "Bicycle (no flat mileage rate)"]]
 /** HMRC approved mileage rates for a tax year (first 10,000 business miles, then the rest). */
 export function mileageRates(vehicle: Vehicle, taxYearStart: number) {
   if (vehicle === "motorcycle") return { first: 0.24, after: 0.24 }
-  if (vehicle === "bicycle") return { first: 0.2, after: 0.2 }
+  // HMRC's flat (simplified expenses) rates cover cars, goods vehicles and motorcycles, not bicycles:
+  // bike costs are claimed as expenses or capital allowances instead
+  if (vehicle === "bicycle") return { first: 0, after: 0 }
+  // 55p from 6 April 2026 (45p before); 25p after 10,000 miles (gov.uk/simpler-income-tax-simplified-expenses/vehicles)
   return { first: taxYearStart >= 2026 ? 0.55 : 0.45, after: 0.25 }
 }
+
+/**
+ * The trading allowance: a flat amount you can deduct from self-employed income INSTEAD of your
+ * real expenses (you can't have both, and mileage counts as an expense). £1,000 until 5 April 2027;
+ * £3,000 from 6 April 2027 (announced in the Autumn Budget 2026).
+ */
+export const tradingAllowance = (taxYearStart: number) => (taxYearStart >= 2027 ? 3000 : 1000)
+export type DeductionMethod = "auto" | "expenses" | "allowance"
 export function mileageAllowance(miles: number, vehicle: Vehicle, taxYearStart: number) {
   const r = mileageRates(vehicle, taxYearStart)
   const first = Math.min(miles, 10000)
@@ -711,6 +724,12 @@ export type TaxSummary = {
   byCategory: { category: ExpenseCategory; amount: number }[]
   miles: number
   mileage: ReturnType<typeof mileageAllowance>
+  /** Whether this estimate deducts real expenses and mileage, or the trading allowance. */
+  method: "expenses" | "allowance"
+  /** The trading allowance for this tax year. */
+  allowance: number
+  /** Both ways worked out, so they can be compared. */
+  compare: Record<"expenses" | "allowance", { deduct: number; profit: number; total: number }>
   /** Self-employment (trading) profit. */
   profit: number
   /** Rental income received in the tax year (from the Accounting tab). */
@@ -750,13 +769,29 @@ export function taxSummary(d: Data, yearOf = today()): TaxSummary {
   const miles = sum(d.entries.filter((e) => mileSvc.has(e.serviceId) && inYear(e.date)).map((e) => Number(e.qty) || 0))
   const startYear = Number(ty.from.slice(0, 4))
   const mileage = mileageAllowance(miles, p.vehicle || "car", startYear)
-  const profit = Math.max(0, income - expenses - mileage.amount)
-  const y = yearTax({ trading: profit, property: rentIncome, salary: Number(p.otherIncome) || 0, scotland: !!p.scotland })
+  const allowance = tradingAllowance(startYear)
+  const salary = Number(p.otherIncome) || 0
+  const way = (deduct: number) => {
+    const profit = Math.max(0, income - deduct)
+    const y = yearTax({ trading: profit, property: rentIncome, salary, scotland: !!p.scotland })
+    return { deduct: Math.min(deduct, income), profit, total: y.total, y }
+  }
+  const viaExpenses = way(expenses + mileage.amount)
+  const viaAllowance = way(allowance)
+  const pref = p.deductionMethod || "auto"
+  const method: "expenses" | "allowance" = pref === "auto" ? (viaAllowance.total < viaExpenses.total ? "allowance" : "expenses") : pref
+  const chosen = method === "allowance" ? viaAllowance : viaExpenses
+  const profit = chosen.profit
+  const y = chosen.y
+  const compare = {
+    expenses: { deduct: viaExpenses.deduct, profit: viaExpenses.profit, total: viaExpenses.total },
+    allowance: { deduct: viaAllowance.deduct, profit: viaAllowance.profit, total: viaAllowance.total },
+  }
   const { tax, incomeTaxDue, ni } = y
   const property = { income: rentIncome, allowance: y.propertyAllowance, taxable: y.propertyTaxable, count: rent.length }
   const t = today()
   const elapsed = t < ty.from ? 0 : t > ty.to ? 1 : Math.min(1, (daysBetween(ty.from, t) + 1) / 365)
-  return { year: ty, income, incomeLines, expenses, byCategory, miles, mileage, profit, property, tax, incomeTaxDue, ni, total: y.total, elapsed }
+  return { year: ty, income, incomeLines, expenses, byCategory, miles, mileage, method, allowance, compare, profit, property, tax, incomeTaxDue, ni, total: y.total, elapsed }
 }
 /** Tax years that have any activity, newest first (always includes the current one). */
 export function taxYearsWithData(d: Data) {
