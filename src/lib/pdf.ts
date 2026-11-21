@@ -142,10 +142,15 @@ export function taxSummaryPdf(t: TaxSummary, who: string, opts: { scotland: bool
   const section = (t2: string) => { y += 2; label(doc, t2, L, y); y += 6 }
   section("Income")
   for (const l of t.incomeLines) row(l.label, money(l.amount), false, 3)
-  section("Allowable expenses")
-  for (const c of t.byCategory) row(categoryName(c.category), `-${money(c.amount)}`, false, 3)
-  if (t.miles > 0) row(`Mileage allowance (${Math.round(t.miles).toLocaleString("en-GB")} miles at HMRC rates)`, `-${money(t.mileage.amount)}`, false, 3)
-  if (!t.byCategory.length && !t.miles) row("None recorded", money(0), false, 3)
+  if (t.method === "allowance") {
+    section("Trading allowance")
+    row(`Trading allowance (instead of expenses and mileage of ${money(t.expenses + t.mileage.amount)})`, `-${money(t.compare.allowance.deduct)}`, false, 3)
+  } else {
+    section("Allowable expenses")
+    for (const c of t.byCategory) row(categoryName(c.category), `-${money(c.amount)}`, false, 3)
+    if (t.miles > 0) row(`Mileage allowance (${Math.round(t.miles).toLocaleString("en-GB")} miles at HMRC rates)`, `-${money(t.mileage.amount)}`, false, 3)
+    if (!t.byCategory.length && !t.miles) row("None recorded", money(0), false, 3)
+  }
   y += 1; rule(doc, y - 4); row("Taxable profit", money(t.profit), true)
   if (t.property.income > 0) {
     row(`Rental income (${t.property.count})`, money(t.property.income), false, 3)
@@ -166,9 +171,10 @@ export function taxSummaryPdf(t: TaxSummary, who: string, opts: { scotland: bool
   doc.setFontSize(8.5); doc.setTextColor(...MUTED)
   const notes = [
     `Settings: ${opts.scotland ? "Scottish" : "England, Wales and Northern Ireland"} income tax rates; ${opts.basis === "cash" ? "cash basis (income counted when paid)" : "income counted when the work was done"}; vehicle: ${opts.vehicle}.`,
-    "2026/27 rates: personal allowance £12,570; Class 4 National Insurance 6% on profits £12,570–£50,270 and 2% above; mileage 55p a mile for the first 10,000 business miles in a car or van, then 25p.",
+    `${t.year.label} rates: personal allowance £12,570; Class 4 National Insurance 6% on profits £12,570–£50,270 and 2% above; trading allowance ${money(t.allowance)}; mileage ${Math.round(t.mileage.rates.first * 100)}p a mile for the first 10,000 business miles, then ${Math.round(t.mileage.rates.after * 100)}p.`,
+    `Expenses or trading allowance: claiming expenses and mileage gives tax and NI of ${money(t.compare.expenses.total)}; the trading allowance gives ${money(t.compare.allowance.total)}. This estimate uses ${t.method === "allowance" ? "the trading allowance" : "expenses and mileage"}. You can't claim both.`,
     ...(t.property.income > 0 ? ["Rental income uses the £1,000 property allowance instead of actual rental expenses, and has no National Insurance. If your rental expenses are more than £1,000, claiming them instead would lower the tax."] : []),
-    "This is an estimate to help you plan. It is not tax advice and doesn’t include student loans, pension contributions, savings interest, dividends or payments on account. Check your figures with HMRC or an accountant before filing.",
+    "This is an estimate to help you plan. It is not financial or tax advice and doesn’t include student loans, pension contributions, savings interest, dividends or payments on account. Check your figures with HMRC or an accountant before filing.",
   ]
   for (const n of notes) { const t2 = doc.splitTextToSize(n, R - L) as string[]; if (y + t2.length * 4 > 285) { doc.addPage(); y = 22 } doc.text(t2, L, y); y += t2.length * 4 + 2 }
   return doc

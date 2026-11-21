@@ -61,7 +61,7 @@ function SiteFooter({ onFeedback, onHome }: { onFeedback: () => void; onHome: ()
       <span>{BRAND} · {TAGLINE}</span>
       <nav aria-label="Site" className="flex flex-wrap gap-x-5 gap-y-1">
         <button type="button" className={link} onClick={onHome}>Home</button>
-        <a className={link} href={PRIVACY_URL} target="_blank" rel="noopener">Privacy policy</a>
+        <a className={link} href={PRIVACY_URL} target="_blank" rel="noopener">Privacy & disclaimer</a>
         <button type="button" className={link} onClick={onFeedback}>Send feedback</button>
         <a className={link} href={`mailto:${CONTACT_EMAIL}`}>Contact</a>
       </nav>
