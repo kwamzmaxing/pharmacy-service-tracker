@@ -10,6 +10,7 @@ import { categoryName, fmtDate, mileageRates, money, PROPERTY_ALLOWANCE, taxSumm
 import { saveFile } from "@/lib/store"
 import { useApp } from "./ctx"
 import { Chips, Ledger, MoneyField, Panel } from "./bits"
+import { MtdPanel } from "./MtdPanel"
 import { BASICS, DATES, EXPENSE_TIPS, GuideNote, HELP, PAYE, Tips } from "./TaxGuide"
 import { ExternalLink } from "lucide-react"
 
@@ -186,6 +187,8 @@ export function TaxTab() {
           <a href="https://www.gov.uk/guidance/tax-free-allowances-on-property-and-trading-income" target="_blank" rel="noopener noreferrer" className="font-medium text-brand-ink hover:underline">GOV.UK</a> · <a href="https://www.gov.uk/government/publications/income-tax-increasing-the-trading-allowance" target="_blank" rel="noopener noreferrer" className="font-medium text-brand-ink hover:underline">£3,000 from April 2027</a>. A guide, not financial advice.
         </p>
       </Panel>
+
+      <MtdPanel startYear={startYear} />
 
       <Panel title="Understanding your tax" aside="Tips for locum pharmacists">
         <p className="mb-2 max-w-[64ch] text-[13px] text-muted-foreground">Short answers to common questions, each taken from GOV.UK with a link to check it yourself. Tap a question to open it.</p>

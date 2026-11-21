@@ -126,7 +126,7 @@ export const DATES: Tip[] = [
         <li>£30,000 in 2025 to 2026: from 6 April 2027</li>
         <li>£20,000 in 2026 to 2027: from 6 April 2028</li>
       </ul>
-      <p>HMRC writes to you if you need to start, but it’s your responsibility to check. HMRC’s online tool tells you if and when.</p>
+      <p>HMRC writes to you if you need to start, but it’s your responsibility to check. HMRC’s online tool tells you if and when. The Making Tax Digital section on this page shows your quarterly updates and exports your records for HMRC-recognised software.</p>
     </>,
     sources: [["Find out if and when you need to use Making Tax Digital for Income Tax", `${G}/guidance/find-out-if-and-when-you-need-to-use-making-tax-digital-for-income-tax`], ["Self Assessment: who must send a tax return", `${G}/self-assessment-tax-returns/who-must-send-a-tax-return`]],
   },
