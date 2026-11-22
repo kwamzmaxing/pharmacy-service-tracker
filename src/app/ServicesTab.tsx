@@ -28,8 +28,10 @@ export function ServicesTab() {
     commit((d) => { d.services = STD_SERVICES(); d.meta.ratesV = "d1" }, "D’s rates loaded ✓")
   }
   async function remove(id: string) {
-    if (data.entries.some((e) => e.serviceId === id) && !(await ask({ title: "Remove service?", message: "You have entries logged under this service. They keep their recorded fee.", ok: "Remove", danger: true }))) return
-    commit((d) => void (d.services = d.services.filter((s) => s.id !== id)), "Removed")
+    const s = data.services.find((x) => x.id === id)
+    const used = data.entries.some((e) => e.serviceId === id)
+    if (!(await ask({ title: "Delete this service?", message: `Delete “${s?.name || "this service"}”?${used ? " You have entries logged under it: they keep their recorded fee." : ""}`, ok: "Delete", danger: true }))) return
+    commit((d) => void (d.services = d.services.filter((x) => x.id !== id)), `${s?.name || "Service"} deleted`, { undo: true })
   }
 
   return (

@@ -9,6 +9,13 @@ export type LogMode = "service" | "hours" | "journey"
 export type EmailKind = "invoice" | "followup"
 export type Me = { uid: string; email: string; name: string; emailVerified: boolean; viaGoogle: boolean }
 
+export type CommitOptions = {
+  /** Show "Undo" on the message for a few seconds (for deletions). */
+  undo?: boolean
+  /** Runs once the change can no longer be undone (e.g. delete a receipt photo for good). */
+  onExpire?: () => void
+}
+
 export type AskOptions = {
   title: string
   message: string
@@ -22,7 +29,7 @@ export type AppApi = {
   data: Data
   me: Me
   /** Apply a change, save it, optionally toast. */
-  commit: (fn: (d: Data) => void, message?: string) => void
+  commit: (fn: (d: Data) => void, message?: string, opts?: CommitOptions) => void
   replaceAll: (d: Data, message?: string) => void
   ask: (o: AskOptions) => Promise<boolean>
   /** Open a section; for the log, optionally which form to start on. */

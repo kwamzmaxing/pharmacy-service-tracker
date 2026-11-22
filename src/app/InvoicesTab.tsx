@@ -61,7 +61,7 @@ export function InvoicesTab() {
     commit((d) => {
       d.invoices = d.invoices.filter((x) => x.id !== i.id)
       for (const e of d.entries) if (e.invoiceId === i.id) { e.invoiced = false; delete e.invoiceId }
-    }, `${i.number} deleted`)
+    }, `${i.number} deleted`, { undo: true })
   }
 
   return (

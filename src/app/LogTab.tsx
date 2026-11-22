@@ -79,14 +79,14 @@ export function LogTab() {
         else d.entries.push({ id: uid(), serviceId: svc.id, date: hDate, qty: h, fee: svc.fee, desc: "", invoiced: false, hours: true, ...(form.clientId ? { clientId: form.clientId } : {}) })
       }, "Hours saved ✓")
     } else if (existingHours) {
-      commit((d) => void (d.entries = d.entries.filter((e) => e.id !== existingHours.id)), "Hours cleared for that day")
+      commit((d) => void (d.entries = d.entries.filter((e) => e.id !== existingHours.id)), "Hours cleared for that day", { undo: true })
     } else toast("Enter the hours first.")
   }
 
   const list = useMemo(() => [...data.entries].sort((a, b) => b.date.localeCompare(a.date)), [data.entries])
   async function remove(e: Entry) {
     if (e.invoiced && !(await ask({ title: "Delete invoiced entry?", message: "This entry is on an invoice. The saved invoice won’t change.", ok: "Delete", danger: true }))) return
-    commit((d) => void (d.entries = d.entries.filter((x) => x.id !== e.id)), "Entry deleted")
+    commit((d) => void (d.entries = d.entries.filter((x) => x.id !== e.id)), "Entry deleted", { undo: true })
     if (editingId === e.id) setEditingId(null)
   }
 

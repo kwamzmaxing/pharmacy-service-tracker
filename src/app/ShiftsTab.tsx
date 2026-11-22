@@ -159,30 +159,37 @@ export function ShiftsTab() {
                 const inMonth = date.startsWith(month)
                 const pay = list.reduce((a, s) => a + shiftPay(s), 0)
                 return (
-                  <button key={date} type="button" role="gridcell" aria-selected={day === date}
-                    aria-label={`${longDay(date)}: ${list.length ? `${plural(list.length, "shift")}, ${money(pay)}` : "no shifts"}${ev.length ? `, ${plural(ev.length, "other event")}` : ""}`}
-                    onClick={() => setDay(date)} onDoubleClick={() => setDraft({ date })}
+                  // Tap empty space on a day to book a shift there; tap a shift to change it.
+                  // On phones the shifts are dots, so a day that has shifts opens its list below instead.
+                  <div key={date} role="gridcell" tabIndex={0} aria-selected={day === date}
+                    aria-label={`${longDay(date)}: ${list.length ? `${plural(list.length, "shift")}, ${money(pay)}` : "no shifts"}${ev.length ? `, ${plural(ev.length, "other event")}` : ""}. Press Enter to book a shift.`}
+                    onClick={() => { setDay(date); if (!list.length || window.matchMedia("(min-width: 640px)").matches) setDraft({ date }) }}
+                    onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setDay(date); setDraft({ date }) } }}
                     className={cn(
-                      "flex min-h-[54px] min-w-0 flex-col items-stretch gap-0.5 rounded-lg p-1 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:min-h-[92px] sm:p-1.5",
+                      "flex min-h-[54px] min-w-0 cursor-pointer flex-col items-stretch gap-0.5 rounded-lg p-1 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:min-h-[92px] sm:p-1.5",
                       day === date ? "bg-secondary" : "hover:bg-secondary/60",
                       !inMonth && "opacity-45",
                     )}>
                     <span className={cn("num flex size-6 items-center justify-center self-center rounded-full text-[12.5px] sm:self-start", date === t0 && "bg-primary font-semibold text-primary-foreground")}>{Number(date.slice(8))}</span>
-                    {/* Phones: a dot per shift. Wider screens: time and place. */}
+                    {/* Phones: a dot per shift. Wider screens: time and place, each one tappable. */}
                     <span className="flex flex-wrap justify-center gap-0.5 sm:hidden">
                       {list.slice(0, 3).map((s) => <span key={s.id} className={cn("size-1.5 rounded-full", s.entryId ? "bg-ok-ink" : "bg-primary")} />)}
                       {ev.slice(0, 2).map((e) => <span key={e.id} className="size-1.5 rounded-full bg-muted-foreground/50" />)}
                     </span>
                     <span className="hidden min-w-0 flex-col gap-0.5 sm:flex">
                       {list.slice(0, 2).map((s) => (
-                        <span key={s.id} className={cn("truncate rounded px-1 py-0.5 text-[11px] font-medium leading-tight", s.entryId ? "bg-ok-tint text-ok-ink" : "bg-primary/15 text-foreground")}>
+                        <button key={s.id} type="button" aria-label={`Change ${placeName(data, s)}, ${s.start}`}
+                          onClick={(e) => { e.stopPropagation(); setDay(date); setDraft({ ...s }) }}
+                          className={cn("truncate rounded px-1 py-0.5 text-left text-[11px] font-medium leading-tight hover:ring-1 hover:ring-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring", s.entryId ? "bg-ok-tint text-ok-ink" : "bg-primary/15 text-foreground")}>
                           {s.start} {placeName(data, s)}
-                        </span>
+                        </button>
                       ))}
                       {ev.slice(0, list.length >= 2 ? 0 : 2 - list.length).map((e) => <span key={e.id} className="truncate rounded border border-dashed border-border px-1 text-[11px] leading-tight text-muted-foreground">{e.allDay ? "" : e.start + " "}{e.title}</span>)}
-                      {list.length + ev.length > 2 && <span className="px-1 text-[11px] text-muted-foreground">+{list.length + ev.length - 2} more</span>}
+                      {list.length + ev.length > 2 && (
+                        <button type="button" onClick={(e) => { e.stopPropagation(); setDay(date) }} className="rounded px-1 text-left text-[11px] text-muted-foreground hover:text-foreground">+{list.length + ev.length - 2} more</button>
+                      )}
                     </span>
-                  </button>
+                  </div>
                 )
               })}
             </div>
@@ -192,6 +199,8 @@ export function ShiftsTab() {
           <li className="flex items-center gap-1.5"><span className="size-2 rounded-full bg-primary" />Booked</li>
           <li className="flex items-center gap-1.5"><span className="size-2 rounded-full bg-ok-ink" />In your log</li>
           {showGoogle && <li className="flex items-center gap-1.5"><span className="size-2 rounded-full bg-muted-foreground/50" />Google Calendar</li>}
+          <li className="ml-auto hidden sm:block">Click a day to book · click a shift to change it</li>
+          <li className="w-full sm:hidden">Tap an empty day to book · tap a day with shifts to see and change them below</li>
         </ul>
 
         <div className="mt-5 border-t pt-4">

@@ -11,6 +11,7 @@ import { cn } from "@/lib/utils"
 import { fmtDate, money, monthLabel, today, uid, type Budget, type IncomeKind, type OtherIncome, type Pot, type SaverStyle } from "@/lib/model"
 import { allocated, BASES, TAX_TAB_KINDS, freeColor, INCOME_KINDS, incomeKindName, MAX_POTS, moneyIn, pruneMoved, starterPots, STYLES, suggest } from "@/lib/budget"
 import { useApp } from "./ctx"
+import { SavingsGuide } from "./SavingsGuide"
 import { Chips, Empty, Field, Ledger, MoneyField, Panel } from "./bits"
 import { Donut, type Slice } from "./charts"
 
@@ -29,7 +30,7 @@ function SavedMoney({ id, label, value, onSave }: { id: string; label: string; v
 export function BudgetTab() {
   const { data, commit, ask, go } = useApp()
   const b = data.budget
-  const setB = (fn: (b: Budget) => void, message?: string) => commit((d) => fn(d.budget), message)
+  const setB = (fn: (b: Budget) => void, message?: string, undo = false) => commit((d) => fn(d.budget), message, { undo })
   const [hot, setHot] = useState<string | null>(null)
 
   const m = moneyIn(data, b.basis)
@@ -139,6 +140,8 @@ export function BudgetTab() {
 
       <OtherIncomePanel incomes={b.incomes} setB={setB} ask={ask} />
 
+      <SavingsGuide />
+
       <p className="max-w-3xl px-1 text-[12.5px] leading-relaxed text-muted-foreground">
         <Sparkles className="mr-1 inline size-3.5 -translate-y-px" />
         The suggested split is worked out from your own figures: what came in, your expenses, your tax settings and the amounts above. The tax pot uses this year’s UK rates on a full year at this month’s pace, so treat it as an estimate. This is general guidance, not financial advice. Nothing moves money for you: tick off each pot when you’ve moved it at your bank.
@@ -150,7 +153,7 @@ export function BudgetTab() {
 /* ---------- my own split ---------- */
 function CustomPots({ pots, total, hot, setHot, setB, free, over, ask }: {
   pots: Pot[]; total: number; hot: string | null; setHot: (id: string | null) => void
-  setB: (fn: (b: Budget) => void, message?: string) => void; free: number; over: number
+  setB: (fn: (b: Budget) => void, message?: string, undo?: boolean) => void; free: number; over: number
   ask: (o: { title: string; message: string; ok?: string; danger?: boolean }) => Promise<boolean>
 }) {
   // Slider values while dragging, saved when let go
@@ -169,7 +172,7 @@ function CustomPots({ pots, total, hot, setHot, setB, free, over, ask }: {
               <PotName pot={p} onSave={(name) => update(p.id, (q) => void (q.name = name))} onFocus={() => setHot(p.id)} />
               <span className="num whitespace-nowrap text-right text-[14.5px]">{money((total * pctOf(p)) / 100)}</span>
               <Button size="icon" variant="ghost" className="size-8 text-muted-foreground" aria-label={`Remove ${p.name || "pot"}`}
-                onClick={async () => { if (await ask({ title: "Remove this pot?", message: `“${p.name || "Unnamed pot"}” will be taken out of your split.`, ok: "Remove", danger: true })) setB((x) => void (x.custom = x.custom.filter((q) => q.id !== p.id)), "Removed ✓") }}>
+                onClick={async () => { if (await ask({ title: "Remove this pot?", message: `“${p.name || "Unnamed pot"}” will be taken out of your split.`, ok: "Remove", danger: true })) setB((x) => void (x.custom = x.custom.filter((q) => q.id !== p.id)), "Pot removed", true) }}>
                 <Trash2 />
               </Button>
             </div>
@@ -234,7 +237,7 @@ function PctBox({ value, label, onSave }: { value: number; label: string; onSave
 /* ---------- tick off each pot as it's moved ---------- */
 function MoveMoney({ pots, amountOf, moved, setB, basisNote }: {
   pots: Pot[]; amountOf: (p: Pot) => number; moved: Budget["moved"]
-  setB: (fn: (b: Budget) => void, message?: string) => void; basisNote: boolean
+  setB: (fn: (b: Budget) => void, message?: string, undo?: boolean) => void; basisNote: boolean
 }) {
   const ym = today().slice(0, 7)
   const done = new Set(moved[ym] || [])
@@ -273,7 +276,7 @@ function MoveMoney({ pots, amountOf, moved, setB, basisNote }: {
 const blank = (): OtherIncome => ({ id: "", date: today(), amount: 0, kind: "selfemployed", desc: "", setAsideTax: true })
 
 function OtherIncomePanel({ incomes, setB, ask }: {
-  incomes: OtherIncome[]; setB: (fn: (b: Budget) => void, message?: string) => void
+  incomes: OtherIncome[]; setB: (fn: (b: Budget) => void, message?: string, undo?: boolean) => void
   ask: (o: { title: string; message: string; ok?: string; danger?: boolean }) => Promise<boolean>
 }) {
   const [form, setForm] = useState<OtherIncome | null>(null)
@@ -342,7 +345,7 @@ function OtherIncomePanel({ incomes, setB, ask }: {
               <span className="num text-[14px]">{money(i.amount)}</span>
               <Button size="icon" variant="ghost" className="size-8 text-muted-foreground" aria-label="Edit" onClick={() => setForm({ ...i })}><Pencil /></Button>
               <Button size="icon" variant="ghost" className="size-8 text-muted-foreground" aria-label="Delete"
-                onClick={async () => { if (await ask({ title: "Delete this income?", message: `${money(i.amount)} on ${fmtDate(i.date)} will be removed.`, ok: "Delete", danger: true })) setB((x) => void (x.incomes = x.incomes.filter((q) => q.id !== i.id)), "Deleted ✓") }}>
+                onClick={async () => { if (await ask({ title: "Delete this income?", message: `${money(i.amount)} on ${fmtDate(i.date)} will be removed.`, ok: "Delete", danger: true })) setB((x) => void (x.incomes = x.incomes.filter((q) => q.id !== i.id)), "Income deleted", true) }}>
                 <Trash2 />
               </Button>
             </li>

@@ -184,6 +184,8 @@ export type Shift = {
   /** The matching Google Calendar event, and the shift as it was when last sent there. */
   gcalId?: string
   gcalSent?: string
+  /** Shifts booked together as a weekly repeat share this, so later ones can be changed together. */
+  series?: string
   created: string
 }
 export type ShiftCal = {

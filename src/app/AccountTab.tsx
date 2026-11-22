@@ -291,7 +291,7 @@ export function AccountTab() {
                 try { set("logo", await shrinkImage(f, 480, "image/png")) } catch { toast.error("That image couldn’t be used as a logo.") }
               }} />
               <Button type="button" variant="outline" size="sm" onClick={() => document.getElementById("p-logo")?.click()}>{p.logo ? "Change logo" : "Add a logo"}</Button>
-              {p.logo && <Button type="button" variant="ghost" size="sm" onClick={() => commit((d) => void delete d.profile.logo, "Logo removed")}>Remove</Button>}
+              {p.logo && <Button type="button" variant="ghost" size="sm" onClick={() => commit((d) => void delete d.profile.logo, "Logo removed", { undo: true })}>Remove</Button>}
               <span className="text-[12px] text-muted-foreground">Shown at the top of your invoices.</span>
             </div>
             {text("fullName", "Full name", { autoComplete: "name" })}
