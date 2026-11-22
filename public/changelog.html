@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+<meta charset="UTF-8" />
+<script>
+  try { var t = localStorage.getItem("pst_theme") || "dark"; if (t === "system") t = matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light"; document.documentElement.dataset.theme = t } catch (e) { document.documentElement.dataset.theme = "dark" }
+</script>
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>What’s new · KASA.Rx</title>
+<meta name="description" content="Changes and improvements to KASA.Rx." />
+<link rel="icon" href="favicon.svg" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@100..125,400..700&family=Inter:wght@400..700&display=swap" rel="stylesheet" />
+<style>
+  :root, [data-theme="light"] { --bg: #f1f1f5; --card: #ffffff; --fg: #171721; --muted: #5d5d6e; --line: #e2e2ea; --accent: #3a4fd6; }
+  [data-theme="dark"] { --bg: #171721; --card: #1e1e2a; --fg: #ececf3; --muted: #aeaeb8; --line: #2c2c3a; --accent: #a5b0f7; }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--fg); font: 15.5px/1.65 Inter, system-ui, sans-serif; -webkit-font-smoothing: antialiased; }
+  .wrap { max-width: 760px; margin: 0 auto; padding: 0 16px; }
+  header { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 20px 0; }
+  .brand { display: flex; align-items: center; gap: 12px; color: inherit; text-decoration: none; font-family: Archivo, Inter, sans-serif; font-stretch: 118%; font-weight: 500; font-size: 17px; }
+  .mark { display: flex; width: 36px; height: 36px; align-items: center; justify-content: center; border-radius: 9px; background: var(--card); font-size: 20px; }
+  .back { color: var(--muted); text-decoration: none; font-size: 14px; border-radius: 999px; padding: 8px 16px; background: var(--card); }
+  .back:hover { color: var(--fg); }
+  h1, h2 { font-family: Archivo, Inter, sans-serif; font-stretch: 118%; font-weight: 500; letter-spacing: .01em; line-height: 1.2; }
+  h1 { font-size: clamp(30px, 6vw, 44px); margin: 40px 0 8px; }
+  h2 { font-size: 19px; margin: 0 0 12px; }
+  .updated { color: var(--muted); font-size: 14px; margin: 0 0 32px; }
+  section { background: var(--card); border-radius: 16px; padding: 24px; margin-bottom: 12px; }
+  @media (min-width: 640px) { section { padding: 28px 32px; } }
+  p, li { margin: 0 0 10px; }
+  section > :last-child { margin-bottom: 0; }
+  ul { padding-left: 20px; margin: 0 0 10px; }
+  strong { font-weight: 600; }
+  a { color: var(--accent); }
+  .summary { font-size: 16.5px; }
+  table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  th, td { text-align: left; vertical-align: top; padding: 10px 12px 10px 0; border-top: 1px solid var(--line); }
+  th { color: var(--muted); font-weight: 500; font-size: 12.5px; border-top: 0; }
+  .scroll { overflow-x: auto; }
+  footer { color: var(--muted); font-size: 13px; padding: 28px 0 48px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <a class="brand" href="./"><span class="mark" aria-hidden="true">℞</span><span>KASA<span style="color:var(--accent)">.Rx</span></span></a>
+    <a class="back" href="./">Back to the tracker</a>
+  </header>
+
+  <h1>What’s new</h1>
+  <p class="updated">Changes to KASA.Rx, newest first.</p>
+
+  <section>
+    <h2>22 November 2026</h2>
+    <ul>
+      <li>Every delete now has an <strong>Undo</strong> button, and deleting a service asks first.</li>
+      <li>Install KASA.Rx on your phone as an app; it opens and logs work without signal.</li>
+      <li>Spreadsheet exports use a maintained library (ExcelJS).</li>
+      <li>Tax, National Insurance, mileage, Making Tax Digital and invoice sums are checked by automated tests against HMRC’s own examples before every update.</li>
+      <li>Tax pages show when the figures were last checked against GOV.UK.</li>
+      <li>Accessibility fixes (screen-reader labels, contrast), smaller download, and clearer bank-detail checks.</li>
+      <li>Deleting your account now also deletes your feedback, queued emails and crash reports.</li>
+      <li>Crash reports so problems can be fixed quickly (no tracker data is sent).</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>22 November 2026 (earlier)</h2>
+    <ul>
+      <li>Shifts calendar: click empty space to book, click a shift to change it; change or delete “this and later” weekly repeats.</li>
+      <li>Accounting: “Where to keep your savings”, with links to live rate tables and an interest estimator.</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>21 November 2026</h2>
+    <ul>
+      <li>Making Tax Digital: your four quarterly updates with HMRC’s deadlines, and an export for HMRC-recognised software.</li>
+      <li>Tax tips for locum pharmacists, each from GOV.UK, including PAYE plus locum work and where to claim your GPhC fee.</li>
+      <li>Compare claiming expenses with the trading allowance (£3,000 from April 2027).</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>20 November 2026</h2>
+    <ul>
+      <li>Shifts: book work on a calendar, sync with Google Calendar and add worked shifts to your log.</li>
+      <li>Accounting: budget split, other income and links to the Tax tab.</li>
+      <li>New Home page, privacy policy, KASA.Rx branding and a fresh design with dark and light modes.</li>
+      <li>Phone navigation bar, faster first load, and a short welcome for new accounts.</li>
+      <li>Emails sent through the admin are checked and limited, and admin requires Google sign-in.</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>19–20 November 2026</h2>
+    <ul>
+      <li>Journey mileage calculator with a map, expenses with receipt photos, tax estimate and PDF invoices.</li>
+      <li>Mileage service, pharmacy profiles and a smarter Invoices page.</li>
+      <li>KASA.Rx launched: accounts on any device, invoices by email, follow-ups and payment dates in your calendar.</li>
+    </ul>
+  </section>
+
+  <footer>KASA.Rx · The service tracker run by KASA · <a href="privacy.html">Privacy &amp; disclaimer</a> · <a href="mailto:KASA.Scripts@gmail.com">KASA.Scripts@gmail.com</a></footer>
+</div>
+</body>
+</html>

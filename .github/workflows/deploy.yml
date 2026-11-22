@@ -27,9 +27,12 @@ jobs:
           node-version: 22
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      # The tax, National Insurance, mileage, Making Tax Digital and invoice tests must pass before anything goes live
+      - run: pnpm test
       - run: pnpm build
         env:
           BASE_PATH: /${{ github.event.repository.name }}/
+          VITE_BUILD: ${{ github.sha }}
       - run: cp dist/index.html dist/404.html
       - uses: actions/upload-pages-artifact@v3
         with:

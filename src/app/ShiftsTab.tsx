@@ -168,7 +168,7 @@ export function ShiftsTab() {
                     className={cn(
                       "flex min-h-[54px] min-w-0 cursor-pointer flex-col items-stretch gap-0.5 rounded-lg p-1 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:min-h-[92px] sm:p-1.5",
                       day === date ? "bg-secondary" : "hover:bg-secondary/60",
-                      !inMonth && "opacity-45",
+                      !inMonth && "text-muted-foreground",
                     )}>
                     <span className={cn("num flex size-6 items-center justify-center self-center rounded-full text-[12.5px] sm:self-start", date === t0 && "bg-primary font-semibold text-primary-foreground")}>{Number(date.slice(8))}</span>
                     {/* Phones: a dot per shift. Wider screens: time and place, each one tappable. */}

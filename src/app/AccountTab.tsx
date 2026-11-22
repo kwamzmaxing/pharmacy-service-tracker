@@ -9,16 +9,17 @@ import { Button } from "@/components/ui/button"
 import { Switch } from "@/components/ui/switch"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import {
-  entryAmt, invStatus, nextNumber, normalize, plural, today, uid, FOLLOW_UP_DAYS, FOLLOW_UP_REPEAT, TERMS_OPTIONS,
+  entryAmt, invStatus, tidyAccountNumber, tidySortCode, nextNumber, normalize, plural, today, uid, FOLLOW_UP_DAYS, FOLLOW_UP_REPEAT, TERMS_OPTIONS,
   type Data, type Entry, type Profile, type Terms,
 } from "@/lib/model"
 import { auth } from "@/lib/firebase"
-import { forgetPerson, wipeReceipts, wipeVault } from "@/lib/cloud"
+import { forgetPerson, wipeOwnRecords, wipeReceipts, wipeVault } from "@/lib/cloud"
 import { shrinkImage } from "@/lib/images"
 import { saveFile } from "@/lib/store"
 import type { ConnStatus } from "@/lib/google"
 import { CONTACT_EMAIL } from "./brand"
 import { useApp } from "./ctx"
+import { InstallApp } from "./InstallApp"
 import { AreaField, Chips, Field, Panel, Pill } from "./bits"
 import type { ThemePref } from "@/lib/theme"
 
@@ -108,12 +109,10 @@ export function AccountTab() {
       Invoice: i.number, Issued: i.issued, Due: i.due, "Billed to": i.to.name || "", Period: i.period, Total: Number(i.total) || 0,
       Status: STATUS_LABEL[invStatus(i)], "Emailed on": i.sentAt ? i.sentAt.slice(0, 10) : "", "Paid on": i.paidDate || "", "Follow-ups sent": i.reminders.length,
     }))
-    const XLSX = await import("xlsx")
-    const wb = XLSX.utils.book_new()
-    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(log), "Log")
-    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(summary), "Summary")
-    if (invs.length) XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(invs), "Invoices")
-    XLSX.writeFile(wb, `pharmacy-services-${tag}-${today()}.xlsx`)
+    const { downloadWorkbook } = await import("@/lib/sheets")
+    await downloadWorkbook(`pharmacy-services-${tag}-${today()}.xlsx`, [
+      { name: "Log", rows: log }, { name: "Summary", rows: summary }, ...(invs.length ? [{ name: "Invoices", rows: invs }] : []),
+    ])
     toast.success("Excel file saved ✓")
   }
   async function restore(file: File) {
@@ -156,7 +155,7 @@ export function AccountTab() {
   async function removeAccount() {
     const ok = await ask({
       title: "Delete account",
-      message: `This permanently deletes the account ${me.email} and all its entries, invoices and details, on every device.`,
+      message: `This permanently deletes the account ${me.email} and everything stored with it, on every device: entries, invoices, shifts, expenses and receipt photos, pharmacies, budget, feedback you sent and any emails waiting to go out. It can’t be undone.`,
       ok: "Delete account", danger: true, typeToConfirm: "DELETE",
     })
     if (!ok) return
@@ -165,6 +164,7 @@ export function AccountTab() {
     try {
       await wipeVault(u.uid)
       await wipeReceipts(u.uid).catch(() => {})
+      await wipeOwnRecords(u.uid)
       await forgetPerson(u.uid).catch(() => {})
       try {
         await deleteUser(u)
@@ -207,6 +207,8 @@ export function AccountTab() {
           <Button className="mt-3" variant="outline" onClick={logOut}><LogOut /> Log out</Button>
         </Panel>
       )}
+
+      <InstallApp />
 
       <Panel title="Appearance">
         <Chips<ThemePref> label="Appearance" value={theme} onChange={setTheme} options={[["dark", "Dark"], ["light", "Light"], ["system", "Match my device"]]} />
@@ -308,8 +310,14 @@ export function AccountTab() {
             <legend className="mb-2 text-[11px] font-bold uppercase tracking-[0.08em] text-muted-foreground">Getting paid</legend>
             {text("accountName", "Account name")}
             {text("bankName", "Bank (optional)")}
-            {text("sortCode", "Sort code", { placeholder: "00-00-00", inputMode: "numeric" })}
-            {text("accountNumber", "Account number", { placeholder: "12345678", inputMode: "numeric" })}
+            {text("sortCode", "Sort code", { placeholder: "00-00-00", inputMode: "numeric", onBlur: (e) => {
+              const v = e.target.value.trim(); if (!v) return set("sortCode", "")
+              const t = tidySortCode(v); if (t) set("sortCode", t); else toast.error("A sort code is 6 digits, like 12-34-56. Not saved.")
+            } })}
+            {text("accountNumber", "Account number", { placeholder: "12345678", inputMode: "numeric", onBlur: (e) => {
+              const v = e.target.value.trim(); if (!v) return set("accountNumber", "")
+              const t = tidyAccountNumber(v); if (t) set("accountNumber", t); else toast.error("An account number is 6 to 8 digits (most are 8). Not saved.")
+            } })}
             {choose<Terms>("terms", "Payment terms", TERMS_OPTIONS)}
             <div className="grid grid-cols-2 gap-2">
               {text("prefix", "Invoice prefix", { onBlur: (e) => set("prefix", e.target.value.trim() || "INV") })}
@@ -356,7 +364,7 @@ export function AccountTab() {
       </Panel>
 
       <Panel title="Delete account">
-        <p className="mb-3 text-[13px] text-muted-foreground">Permanently removes this account and all its entries, invoices and details. Back up first if you might need them.</p>
+        <p className="mb-3 text-[13px] text-muted-foreground">Permanently removes this account and everything KASA.Rx stores about you: your tracker, receipt photos, profile, feedback, emails waiting to be sent through the admin, and crash reports. HMRC asks you to keep business records for 5 years, so download a back-up or Excel export first. Events already added to your own Google Calendar stay there.</p>
         <Button variant="outline" className="border-destructive/40 text-danger-ink hover:text-danger-ink" onClick={removeAccount}>Delete my account</Button>
       </Panel>
     </div>

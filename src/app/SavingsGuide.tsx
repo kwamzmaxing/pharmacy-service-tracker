@@ -4,7 +4,7 @@
 // Sources: GOV.UK (ISAs, Lifetime ISA, tax on savings interest, Nov 2026); Bank of England (FSCS limit).
 import { useState } from "react"
 import { ExternalLink } from "lucide-react"
-import { money, taxSummary } from "@/lib/model"
+import { fmtDate, money, RATES_CHECKED, taxSummary } from "@/lib/model"
 import { useApp } from "./ctx"
 import { Field, Panel } from "./bits"
 
@@ -77,7 +77,7 @@ export function SavingsGuide() {
             </p>
           )}
         </div>
-        <p className="text-[12px] text-muted-foreground">General information, not financial advice. Check an account’s terms before you open it, and speak to a regulated adviser if you’re unsure.</p>
+        <p className="text-[12px] text-muted-foreground">General information, not financial advice. Figures checked on {fmtDate(RATES_CHECKED)}. Check an account’s terms before you open it, and speak to a regulated adviser if you’re unsure.</p>
       </div>
     </Panel>
   )

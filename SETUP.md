@@ -69,3 +69,22 @@ pnpm dev              # the site, using src/config.ts
 pnpm emulators        # local Firebase for testing (needs Java)
 VITE_USE_EMULATOR=1 pnpm dev   # the site against the local Firebase
 ```
+
+## Backups
+
+Firestore can back up the whole database on a schedule. Backups are billed by Google Cloud (small for a database this size) and need billing on the project. In the Google Cloud console, open **Cloud Shell** (the `>_` icon) and run:
+
+```bash
+gcloud firestore backups schedules create --project=service-tracker-invoice --database='(default)' --recurrence=daily --retention=14d
+```
+
+That keeps a daily backup for 14 days. To check it: `gcloud firestore backups schedules list --project=service-tracker-invoice --database='(default)'`. To restore, see Google's "Restore data from a backup" guide for Firestore.
+
+## Crash reports
+
+When something breaks in someone's browser, a short report (error, page, browser, user ID; never tracker data) is saved to the `errors` collection and shown on the Admin tab under **Crash reports**. Clear them once fixed. The rules in `firestore.rules` allow only the admin to read them.
+
+## Tests and rates
+
+`pnpm test` checks the tax, National Insurance, mileage, Making Tax Digital and invoice maths against HMRC's worked examples. The publish workflow runs them before every release. Each April and December a GitHub issue reminds you to check the rates against GOV.UK; update the code, the tests and `RATES_CHECKED` in `src/lib/model.ts` together.
+

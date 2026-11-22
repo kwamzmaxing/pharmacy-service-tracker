@@ -3,7 +3,7 @@ import { useState } from "react"
 import { ArrowLeft, Check } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
-import { uid } from "@/lib/model"
+import { tidyAccountNumber, tidySortCode, uid } from "@/lib/model"
 import { useApp } from "./ctx"
 import { AreaField, Field } from "./bits"
 
@@ -26,20 +26,21 @@ export function Welcome({ onDone }: { onDone: () => void }) {
   function next() {
     setErr("")
     if (step === 0 && !f.fullName.trim()) return setErr("Enter your name as it should appear on invoices.")
-    if (step === 1 && f.sortCode.trim() && !/^\d{2}-?\d{2}-?\d{2}$/.test(f.sortCode.trim())) return setErr("A sort code is six digits, like 12-34-56.")
-    if (step === 1 && f.accountNumber.trim() && !/^\d{6,8}$/.test(f.accountNumber.trim())) return setErr("An account number is 8 digits.")
+    if (step === 1 && f.sortCode.trim() && !tidySortCode(f.sortCode)) return setErr("A sort code is 6 digits, like 12-34-56.")
+    if (step === 1 && f.accountNumber.trim() && !tidyAccountNumber(f.accountNumber)) return setErr("An account number is 6 to 8 digits (most are 8), with no letters.")
     if (step < STEPS.length - 1) return setStep(step + 1)
     finish()
   }
   function finish() {
-    const sc = f.sortCode.replace(/\D/g, "")
+    const sc = tidySortCode(f.sortCode)
     commit((d) => {
       const p = d.profile
       p.fullName = f.fullName.trim()
       p.tradingName = f.tradingName.trim()
       if (!p.accountName || f.accountName.trim()) p.accountName = f.accountName.trim() || p.fullName
-      if (sc.length === 6) p.sortCode = `${sc.slice(0, 2)}-${sc.slice(2, 4)}-${sc.slice(4)}`
-      if (f.accountNumber.trim()) p.accountNumber = f.accountNumber.trim()
+      if (sc) p.sortCode = sc
+      const acc = tidyAccountNumber(f.accountNumber)
+      if (acc) p.accountNumber = acc
       if (f.pharmacy.trim()) {
         d.clients.push({ id: uid(), name: f.pharmacy.trim(), contact: "", email: f.pharmacyEmail.trim(), phone: "", address: f.pharmacyAddress.trim(), notes: "", created: new Date().toISOString() })
       }

@@ -1,0 +1,36 @@
+name: Tax rates reminder
+
+# Opens a checklist issue each year when rates change: after 6 April (new tax year) and in December
+# (after the Autumn Budget). Can also be run by hand from the Actions tab.
+on:
+  schedule:
+    - cron: "0 9 7 4 *"
+    - cron: "0 9 1 12 *"
+  workflow_dispatch:
+
+permissions:
+  issues: write
+
+jobs:
+  remind:
+    runs-on: ubuntu-latest
+    steps:
+      - env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+        run: |
+          gh issue create --repo "$REPO" --title "Check tax rates and figures ($(date +%B\ %Y))" --body "$(cat <<'BODY'
+          Time to check KASA.Rx's tax figures against GOV.UK. Update the code, the tests and the "figures checked" date (RATES_CHECKED in src/lib/model.ts) together.
+
+          - [ ] Income tax bands and Personal Allowance: https://www.gov.uk/income-tax-rates
+          - [ ] Scottish bands: https://www.gov.uk/scottish-income-tax
+          - [ ] Class 4 and Class 2 National Insurance: https://www.gov.uk/self-employed-national-insurance-rates
+          - [ ] Mileage flat rates: https://www.gov.uk/simpler-income-tax-simplified-expenses/vehicles
+          - [ ] Trading and property allowances: https://www.gov.uk/guidance/tax-free-allowances-on-property-and-trading-income
+          - [ ] Making Tax Digital thresholds and deadlines: https://www.gov.uk/guidance/find-out-if-and-when-you-need-to-use-making-tax-digital-for-income-tax
+          - [ ] ISA allowance, Personal Savings Allowance: https://www.gov.uk/individual-savings-accounts and https://www.gov.uk/apply-tax-free-interest-on-savings
+          - [ ] FSCS limit: https://www.bankofengland.co.uk/explainers/what-is-the-financial-services-compensation-scheme
+          - [ ] Tax tips (src/app/TaxGuide.tsx): every figure and link still right
+          - [ ] Run `pnpm test`, then publish
+          BODY
+          )"

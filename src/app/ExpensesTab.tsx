@@ -59,11 +59,8 @@ export function ExpensesTab() {
     for (const [c, name] of EXPENSE_CATEGORIES) totals[name] = sum(inYear.filter((x) => x.category === c))
     totals.Total = sum(inYear)
     summary.push(totals)
-    const XLSX = await import("xlsx")
-    const wb = XLSX.utils.book_new()
-    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(summary), "Monthly summary")
-    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rows), "Expenses")
-    XLSX.writeFile(wb, `expenses-${ty.label.replace("/", "-")}.xlsx`)
+    const { downloadWorkbook } = await import("@/lib/sheets")
+    await downloadWorkbook(`expenses-${ty.label.replace("/", "-")}.xlsx`, [{ name: "Monthly summary", rows: summary }, { name: "Expenses", rows }])
     toast.success("Expenses exported ✓")
   }
 

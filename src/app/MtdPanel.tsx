@@ -5,7 +5,7 @@ import { toast } from "sonner"
 import { Download, ExternalLink, FileSpreadsheet } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
-import { fmtDate, money, today } from "@/lib/model"
+import { fmtDate, money, RATES_CHECKED, today } from "@/lib/model"
 import { digitalRecords, HMRC_EXPENSES, HMRC_INCOME, loggedIn, MTD_THRESHOLDS, qualifyingIncome, updatePeriods, updateTotals, type PeriodKind } from "@/lib/mtd"
 import { saveFile } from "@/lib/store"
 import { useApp } from "./ctx"
@@ -40,11 +40,11 @@ export function MtdPanel({ startYear }: { startYear: number }) {
 
   async function exportFile(type: "xlsx" | "csv") {
     if (!records.length) return toast("Nothing to export for this tax year yet.")
-    const XLSX = await import("xlsx")
+    const { downloadWorkbook, toCsv } = await import("@/lib/sheets")
     const label = `${startYear}-${String(startYear + 1).slice(2)}`
     const rows = records.map((r) => ({ Date: r.date, Type: r.type, "HMRC category": r.category, Description: r.description, "Amount (£)": r.amount, Source: r.source }))
     if (type === "csv") {
-      const csv = XLSX.utils.sheet_to_csv(XLSX.utils.json_to_sheet(rows))
+      const csv = toCsv(rows)
       saveFile(`digital-records-${label}.csv`, new Blob([csv], { type: "text/csv;charset=utf-8" }))
       return toast.success("CSV saved ✓")
     }
@@ -77,11 +77,9 @@ export function MtdPanel({ startYear }: { startYear: number }) {
       ["GOV.UK sources"],
       ...LINKS.map(([l, u]) => [`${l}: ${u}`]),
     ]
-    const wb = XLSX.utils.book_new()
-    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rows), "Digital records")
-    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(quarters), "Quarterly updates")
-    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(notes), "Notes")
-    XLSX.writeFile(wb, `digital-records-${label}.xlsx`)
+    await downloadWorkbook(`digital-records-${label}.xlsx`, [
+      { name: "Digital records", rows }, { name: "Quarterly updates", rows: quarters }, { name: "Notes", lines: notes },
+    ])
     toast.success("Spreadsheet saved ✓")
   }
 
@@ -160,7 +158,7 @@ export function MtdPanel({ startYear }: { startYear: number }) {
           <summary className="cursor-pointer font-medium text-brand-ink">GOV.UK guidance</summary>
           <ul className="mt-2 grid gap-1.5">{LINKS.map(([l, u]) => <li key={u}><A href={u}>{l}</A></li>)}</ul>
         </details>
-        <p className="text-[12px] text-muted-foreground">A guide, not financial or tax advice. Check your records and figures with HMRC or an accountant.</p>
+        <p className="text-[12px] text-muted-foreground">A guide, not financial or tax advice. Dates and categories checked against GOV.UK on {fmtDate(RATES_CHECKED)}. Check your records and figures with HMRC or an accountant.</p>
       </div>
     </Panel>
   )

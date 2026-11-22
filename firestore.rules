@@ -51,6 +51,8 @@ service cloud.firestore {
         && request.resource.data.rating is int && request.resource.data.rating >= 0 && request.resource.data.rating <= 5
         && str(request.resource.data.message, 5000);
       allow read, delete: if isAdmin();
+      // People can find and delete their own feedback (when they delete their account)
+      allow read, delete: if signedIn() && resource.data.uid == request.auth.uid;
     }
 
     // Emails an account holder asks the admin to send from the admin's Gmail.
@@ -75,6 +77,7 @@ service cloud.firestore {
         && getAfter(/databases/$(database)/documents/outboxQuota/$(request.auth.uid)).data.last == id;
       allow read: if isAdmin() || (signedIn() && resource.data.uid == request.auth.uid);
       allow update, delete: if isAdmin();
+      allow delete: if signedIn() && resource.data.uid == request.auth.uid;
     }
 
     // How many emails each person has queued today. Each new outbox item must bump this in the same write.
@@ -88,6 +91,17 @@ service cloud.firestore {
         && request.resource.data.last is string
         && !exists(/databases/$(database)/documents/outbox/$(request.resource.data.last))
         && existsAfter(/databases/$(database)/documents/outbox/$(request.resource.data.last));
+      allow delete: if me(uid);
+    }
+
+    // Crash reports from signed-in people (no tracker data): only the admin can read or clear them.
+    match /errors/{id} {
+      allow create: if signedIn()
+        && request.resource.data.keys().hasOnly(['at', 'message', 'stack', 'page', 'ua', 'uid', 'version'])
+        && request.resource.data.uid == request.auth.uid
+        && str(request.resource.data.at, 40) && str(request.resource.data.message, 500) && str(request.resource.data.stack, 2000)
+        && str(request.resource.data.page, 60) && str(request.resource.data.ua, 200) && str(request.resource.data.version, 40);
+      allow read, delete: if isAdmin() || (signedIn() && resource.data.uid == request.auth.uid);
     }
 
     match /admins/{uid} {
