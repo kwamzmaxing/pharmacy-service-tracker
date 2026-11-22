@@ -10,6 +10,7 @@ import { auth } from "@/lib/firebase"
 import { listFeedback, listOutbox, listPeople, markOutbox, saveSettings, type Feedback, type OutboxItem, type Person, type PublicSettings } from "@/lib/cloud"
 import { GOOGLE_HELP, GoogleError, sendMail, writeSheet } from "@/lib/google"
 import { useApp } from "./ctx"
+import { clearError, listErrors, type ErrorReport } from "@/lib/errors"
 import { Empty, Field, Panel } from "./bits"
 
 const when = (iso?: string) => (iso ? fmtDate(isoOf(new Date(iso))) : "—")
@@ -213,6 +214,8 @@ export function AdminTab() {
         <p className="mt-3 text-[12.5px] text-muted-foreground">Passwords are never stored or shown. A reset link lets the person choose a new password; their data is kept.</p>
       </Panel>
 
+      <ErrorsPanel />
+
       <Panel title="Feedback" aside={`${feedback.length} total`}>
         {!feedback.length ? <Empty title="No feedback yet">Account holders send feedback from their account menu.</Empty> : (
           <ul className="divide-y">
@@ -258,5 +261,34 @@ export function AdminTab() {
         </div>
       </Panel>
     </div>
+  )
+}
+
+/** Crash reports from people's browsers, newest first. */
+function ErrorsPanel() {
+  const [list, setList] = useState<ErrorReport[] | null>(null)
+  const load = useCallback(() => { listErrors().then(setList).catch(() => setList([])) }, [])
+  useEffect(() => { load() }, [load])
+  return (
+    <Panel title="Crash reports" aside={list ? `${list.length} recent` : undefined}>
+      {!list ? <p className="text-[13px] text-muted-foreground">Loading…</p> : !list.length ? (
+        <Empty title="No crashes reported">If something breaks in someone’s browser, a short report appears here (the error, the page, the browser and their user ID; never their tracker data).</Empty>
+      ) : (
+        <ul className="divide-y text-[13px]">
+          {list.map((e) => (
+            <li key={e.id} className="py-2.5">
+              <div className="flex flex-wrap items-start justify-between gap-2">
+                <div className="min-w-0">
+                  <div className="break-words font-semibold">{e.message}</div>
+                  <div className="text-[12px] text-muted-foreground">{when(e.at)} · {e.page} page · {e.ua.match(/(Edg|Chrome|Firefox|Safari)\/[\d.]+/)?.[0] || "browser"}{/Mobile|iPhone|Android/.test(e.ua) ? " · phone" : ""} · user {e.uid.slice(0, 6)}… · {e.version.slice(0, 7)}</div>
+                </div>
+                <Button size="sm" variant="ghost" onClick={() => clearError(e.id).then(() => setList((l) => l?.filter((x) => x.id !== e.id) ?? null)).catch(() => toast.error("Couldn’t clear it."))}>Clear</Button>
+              </div>
+              {e.stack && <details className="mt-1"><summary className="cursor-pointer text-[12px] text-brand-ink">Details</summary><pre className="mt-1 max-h-40 overflow-auto whitespace-pre-wrap break-words rounded bg-secondary p-2 text-[11px]">{e.stack}</pre></details>}
+            </li>
+          ))}
+        </ul>
+      )}
+    </Panel>
   )
 }

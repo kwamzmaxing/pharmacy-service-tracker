@@ -6,7 +6,7 @@ import { Label } from "@/components/ui/label"
 import { Switch } from "@/components/ui/switch"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { cn } from "@/lib/utils"
-import { categoryName, fmtDate, mileageRates, money, PROPERTY_ALLOWANCE, taxSummary, taxYearsWithData, tradingAllowance, yearTax, VEHICLES, type DeductionMethod, type Vehicle } from "@/lib/model"
+import { RATES_CHECKED, categoryName, fmtDate, mileageRates, money, PROPERTY_ALLOWANCE, taxSummary, taxYearsWithData, tradingAllowance, yearTax, VEHICLES, type DeductionMethod, type Vehicle } from "@/lib/model"
 import { saveFile } from "@/lib/store"
 import { useApp } from "./ctx"
 import { Chips, Ledger, MoneyField, Panel } from "./bits"
@@ -80,6 +80,11 @@ export function TaxTab() {
         </div>
         <Button variant="outline" size="sm" onClick={download}><FileDown /> Download summary (PDF)</Button>
       </div>
+
+      <p className="rounded-xl bg-secondary/60 px-4 py-3 text-[12.5px] text-muted-foreground">
+        <b className="font-medium text-foreground">Estimates to help you plan, not financial or tax advice.</b> Figures checked against GOV.UK on {fmtDate(RATES_CHECKED)}. Check with HMRC or an accountant before you file.{" "}
+        <a href={`${import.meta.env.BASE_URL}privacy.html#disclaimer`} target="_blank" rel="noopener" className="underline underline-offset-2">Disclaimer</a>
+      </p>
 
       <Ledger cells={[
         { label: current ? "Taxable profit so far" : "Taxable profit", value: money(t.profit), sub: `${money(t.income)} income` },

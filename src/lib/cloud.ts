@@ -85,6 +85,14 @@ export async function recordPerson(uid: string, p: { name: string; email: string
   await setDoc(doc(db, "users", uid), { name: p.name.slice(0, 120), email: p.email, lastLogin: now, ...(p.isNew ? { created: now } : {}) }, { merge: true })
 }
 export const forgetPerson = (uid: string) => deleteDoc(doc(db, "users", uid))
+/** Everything else stored under this person's ID: feedback, emails queued for the admin, the daily email count, crash reports. */
+export async function wipeOwnRecords(uid: string) {
+  for (const c of ["feedback", "outbox", "errors"]) {
+    const snap = await getDocs(query(collection(db, c), where("uid", "==", uid)))
+    await Promise.all(snap.docs.map((d) => deleteDoc(d.ref)))
+  }
+  await deleteDoc(doc(db, "outboxQuota", uid)).catch(() => {})
+}
 export async function listPeople(): Promise<Person[]> {
   const snap = await getDocs(collection(db, "users"))
   return snap.docs.map((d) => ({ uid: d.id, ...(d.data() as Omit<Person, "uid">) })).sort((a, b) => (a.name || "").localeCompare(b.name || ""))

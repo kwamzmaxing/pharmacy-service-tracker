@@ -3,6 +3,7 @@
 // 2026 to 2027 tax year unless a tip says otherwise. When rates change, update the tip and its link.
 import type { ReactNode } from "react"
 import { ChevronDown, ExternalLink } from "lucide-react"
+import { fmtDate, RATES_CHECKED } from "@/lib/model"
 
 type Source = [label: string, url: string]
 export type Tip = { id: string; q: string; a: ReactNode; sources: Source[] }
@@ -227,7 +228,7 @@ export function Tips({ tips }: { tips: Tip[] }) {
 export function GuideNote() {
   return (
     <p className="mt-3 text-[12px] leading-relaxed text-muted-foreground">
-      A general guide from GOV.UK, not financial or tax advice. Your situation may differ: check with HMRC or a qualified accountant before you file.{" "}
+      A general guide from GOV.UK, not financial or tax advice, checked on {fmtDate(RATES_CHECKED)}. Your situation may differ: check with HMRC or a qualified accountant before you file.{" "}
       <a href={`${import.meta.env.BASE_URL}privacy.html#disclaimer`} target="_blank" rel="noopener" className="underline underline-offset-2">Disclaimer</a>
     </p>
   )

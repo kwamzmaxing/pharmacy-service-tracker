@@ -246,6 +246,22 @@ export const monthLabel = (ym: string) => {
 export const plural = (n: number, w: string, p?: string) => `${n} ${n === 1 ? w : p || w + "s"}`
 export const initials = (name: string) =>
   (name || "?").trim().split(/\s+/).slice(0, 2).map((w) => w[0] || "").join("").toUpperCase() || "?"
+/** When the tax, National Insurance, mileage, allowance and savings figures were last checked against GOV.UK. */
+export const RATES_CHECKED = "2026-11-22"
+
+/** Sort code "123456" or "12 34 56" → "12-34-56"; null if it isn't 6 digits. */
+export function tidySortCode(v: string) {
+  const d = v.replace(/[\s-]/g, "")
+  return /^\d{6}$/.test(d) ? `${d.slice(0, 2)}-${d.slice(2, 4)}-${d.slice(4)}` : null
+}
+/** Account number without spaces; null unless it's 6 to 8 digits. */
+export function tidyAccountNumber(v: string) {
+  const d = v.replace(/\s/g, "")
+  return /^\d{6,8}$/.test(d) ? d : null
+}
+
+/** Round to whole pence. */
+export const pence = (n: number) => Math.round((Number(n) || 0) * 100) / 100
 export const entryAmt = (e: Pick<Entry, "qty" | "fee">) => (Number(e.qty) || 0) * (Number(e.fee) || 0)
 
 /* ---------- defaults ---------- */
@@ -453,8 +469,9 @@ export function draftInvoice(d: Data, r: Range, fallbackName: string, clientId?:
     groups[k].qty += Number(e.qty) || 0
     groups[k].amt += entryAmt(e)
   }
-  const lines = Object.values(groups).sort((a, b) => b.amt - a.amt)
-  const total = lines.reduce((s, l) => s + l.amt, 0)
+  // Whole pence, so lines always add up to the total exactly (no floating-point leftovers)
+  const lines = Object.values(groups).map((l) => ({ ...l, qty: Math.round(l.qty * 100) / 100, amt: pence(l.amt) })).sort((a, b) => b.amt - a.amt)
+  const total = pence(lines.reduce((s, l) => s + l.amt, 0))
   const dates = pend.map((e) => e.date).sort()
   const first = dates[0], last = dates[dates.length - 1]
   const p = d.profile

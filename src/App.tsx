@@ -15,6 +15,7 @@ import { disconnect, GOOGLE_HELP, GoogleError, status as googleStatus, token as 
 import { AppCtx, type AppApi, type AskOptions, type EmailKind, type LogMode, type Me, type Tab } from "@/app/ctx"
 import { ConfirmDialog, EmailDialog, FeedbackDialog, FollowUpDialog, InvoiceDialog } from "@/app/dialogs"
 import { AuthScreen } from "@/app/AuthScreen"
+import { setErrorPage } from "@/lib/errors"
 import { BRAND, CONTACT_EMAIL, PRIVACY_URL, TAGLINE, Wordmark } from "@/app/brand"
 import { LogTab } from "@/app/LogTab"
 import { HomeTab } from "@/app/HomeTab"
@@ -62,6 +63,7 @@ function SiteFooter({ onFeedback, onHome }: { onFeedback: () => void; onHome: ()
       <nav aria-label="Site" className="flex flex-wrap gap-x-5 gap-y-1">
         <button type="button" className={link} onClick={onHome}>Home</button>
         <a className={link} href={PRIVACY_URL} target="_blank" rel="noopener">Privacy & disclaimer</a>
+        <a className={link} href={`${import.meta.env.BASE_URL}changelog.html`} target="_blank" rel="noopener">What’s new</a>
         <button type="button" className={link} onClick={onFeedback}>Send feedback</button>
         <a className={link} href={`mailto:${CONTACT_EMAIL}`}>Contact</a>
       </nav>
@@ -117,6 +119,7 @@ export default function App() {
   const [tab, setTab] = useState<Tab>("home")
   const [logMode, setLogMode] = useState<LogMode>("service")
   const [welcome, setWelcome] = useState(false)
+  useEffect(() => { setErrorPage(tab) }, [tab])
   const [invoiceView, setInvoiceView] = useState<{ id: string; justCreated: boolean } | null>(null)
   const [emailReq, setEmailReq] = useState<{ id: string; kind: EmailKind; fromFollowUps: boolean } | null>(null)
   const [followOpen, setFollowOpen] = useState(false)
@@ -336,13 +339,15 @@ export default function App() {
         <header className="sticky top-[env(safe-area-inset-top,0px)] z-40 bg-background/90 backdrop-blur-md supports-[backdrop-filter]:bg-background/75">
           <div className="wrap">
             <div className="flex items-center justify-between gap-3 pb-3 pt-4">
-              <button type="button" onClick={() => go("home")} aria-label={`${BRAND} home`} className="flex min-w-0 items-center gap-3 rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+              <button type="button" onClick={() => go("home")} className="flex min-w-0 items-center gap-3 rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
                 <Wordmark tagline as="h1" />
+                <span className="sr-only">(home)</span>
               </button>
               <DropdownMenu>
-                <DropdownMenuTrigger aria-label="Account menu" className="flex min-w-0 items-center gap-2 rounded-full py-1 pl-3.5 pr-1 text-[13.5px] text-muted-foreground hover:bg-secondary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                <DropdownMenuTrigger className="flex min-w-0 items-center gap-2 rounded-full py-1 pl-3.5 pr-1 text-[13.5px] text-muted-foreground hover:bg-secondary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
                   <span className="hidden max-w-[180px] truncate sm:inline">{name}</span>
                   <span className="flex size-8 flex-none items-center justify-center rounded-full bg-secondary text-[12.5px] font-medium text-foreground">{initials(name)}</span>
+                  <span className="sr-only">account menu</span>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-64 rounded-xl">
                   <DropdownMenuLabel className="font-normal">
