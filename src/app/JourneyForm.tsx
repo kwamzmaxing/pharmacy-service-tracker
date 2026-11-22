@@ -203,7 +203,7 @@ export function JourneyForm() {
                   <span className="text-[12px] text-muted-foreground">{j.miles} mi each way · used {plural(j.uses || 0, "time")}{j.lastUsed ? `, last on ${fmtDate(j.lastUsed.slice(0, 10))}` : ""}</span>
                 </span>
                 <Button variant="ghost" size="icon" aria-label={`Delete ${j.from.label} to ${j.to.label}`} className="text-muted-foreground hover:text-danger-ink"
-                  onClick={() => commit((d) => void (d.journeys = d.journeys.filter((x) => x.id !== j.id)), "Journey removed")}>
+                  onClick={() => commit((d) => void (d.journeys = d.journeys.filter((x) => x.id !== j.id)), "Journey removed", { undo: true })}>
                   <Trash2 />
                 </Button>
               </li>

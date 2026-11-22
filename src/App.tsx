@@ -240,14 +240,37 @@ export default function App() {
     }, 2500)
     return () => clearTimeout(t)
   }, [phase])
-  const commit = useCallback<AppApi["commit"]>((fn, message) => {
+  const commit = useCallback<AppApi["commit"]>((fn, message, opts) => {
     if (!dataRef.current || !vaultRef.current) return
-    const next = structuredClone(dataRef.current)
+    const prev = dataRef.current
+    const next = structuredClone(prev)
     fn(next)
     dataRef.current = next
     setData(next)
     vaultRef.current.save(next)
-    if (message) toast(message)
+    if (!opts?.undo) {
+      if (message) toast(message)
+      return
+    }
+    // Deletions: offer Undo for a few seconds, then finish anything that can't be reversed
+    let undone = false
+    const expire = setTimeout(() => { if (!undone) opts.onExpire?.() }, 8000)
+    toast(message || "Deleted", {
+      duration: 7000,
+      action: {
+        label: "Undo",
+        onClick: () => {
+          // Only put things back if nothing else has changed since, so later edits are never lost
+          if (dataRef.current !== next || !vaultRef.current) return void toast("Can’t undo now: something else has changed since.")
+          undone = true
+          clearTimeout(expire)
+          dataRef.current = prev
+          setData(prev)
+          vaultRef.current.save(prev)
+          toast("Undone ✓")
+        },
+      },
+    })
   }, [])
   const replaceAll = useCallback<AppApi["replaceAll"]>((d, message) => {
     if (!vaultRef.current) return

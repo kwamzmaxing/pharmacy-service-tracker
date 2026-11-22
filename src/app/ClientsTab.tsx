@@ -127,7 +127,7 @@ function ClientProfile({ c, onBack }: { c: Client; onBack: () => void }) {
       for (const i of d.invoices) if (i.clientId === c.id) delete i.clientId
       for (const e of d.entries) if (e.clientId === c.id) delete e.clientId
       if (d.meta.lastClientId === c.id) delete d.meta.lastClientId
-    }, `${c.name} deleted`)
+    }, `${c.name} deleted`, { undo: true })
     onBack()
   }
 

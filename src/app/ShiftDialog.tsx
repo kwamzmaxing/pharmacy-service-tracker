@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { addDays, fmtDate, money, today, uid, type Shift } from "@/lib/model"
+import { addDays, fmtDate, money, plural, today, uid, type Shift } from "@/lib/model"
 import { clashes, hoursText, placeName, shiftHours, shiftPay, timeText } from "@/lib/shifts"
 import { useApp } from "./ctx"
 import { Chips, MoneyField } from "./bits"
@@ -32,10 +32,13 @@ export function ShiftDialog({ draft, onClose }: { draft: ShiftDraft | null; onCl
   const [f, setF] = useState<Shift>(() => blank(draft ?? { date: today() }))
   const [rate, setRate] = useState("")
   const [repeat, setRepeat] = useState("0")
+  // For a weekly repeat: change just this shift, or this one and the later ones not yet in the log
+  const [scope, setScope] = useState<"one" | "later">("one")
+  const later = existing?.series ? data.shifts.filter((x) => x.series === existing.series && x.id !== existing.id && x.date > existing.date && !x.entryId) : []
   useEffect(() => {
     if (!draft) return
     const s = existing ? { ...existing } : blank(draft)
-    setF(s); setRate(String(s.rate)); setRepeat("0")
+    setF(s); setRate(String(s.rate)); setRepeat("0"); setScope("one")
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [draft])
 
@@ -50,23 +53,32 @@ export function ShiftDialog({ draft, onClose }: { draft: ShiftDraft | null; onCl
     if (!valid) return
     const vals: Shift = { ...live, place: f.clientId ? undefined : f.place?.trim().slice(0, 80), notes: f.notes.trim().slice(0, 500) }
     if (existing) {
-      commit((d) => { const s = d.shifts.find((x) => x.id === existing.id); if (s) Object.assign(s, vals, { id: s.id, created: s.created, entryId: s.entryId, gcalId: s.gcalId, gcalSent: s.gcalSent }) }, "Shift updated ✓")
+      const ids = new Set(scope === "later" ? later.map((x) => x.id) : [])
+      commit((d) => {
+        const s = d.shifts.find((x) => x.id === existing.id)
+        if (s) Object.assign(s, vals, { id: s.id, created: s.created, entryId: s.entryId, gcalId: s.gcalId, gcalSent: s.gcalSent, series: s.series })
+        // Later shifts in the repeat keep their own dates; everything else follows this one
+        for (const x of d.shifts) if (ids.has(x.id)) Object.assign(x, { start: vals.start, end: vals.end, breakMins: vals.breakMins, clientId: vals.clientId, place: vals.place, pay: vals.pay, rate: vals.rate, notes: vals.notes })
+      }, ids.size ? `${ids.size + 1} shifts updated ✓` : "Shift updated ✓")
     } else {
       const n = Number(repeat) || 1
       const now = new Date().toISOString()
       commit((d) => {
-        for (let i = 0; i < Math.max(1, n); i++) d.shifts.push({ ...vals, id: uid(), date: addDays(vals.date, i * 7), created: now })
+        const series = n > 1 ? uid() : undefined
+        for (let i = 0; i < Math.max(1, n); i++) d.shifts.push({ ...vals, id: uid(), date: addDays(vals.date, i * 7), created: now, ...(series ? { series } : {}) })
       }, n > 1 ? `${n} shifts booked ✓` : "Shift booked ✓")
     }
     onClose()
   }
   async function remove() {
     if (!existing) return
-    if (!(await ask({ title: "Delete this shift?", message: `${placeName(data, existing)} on ${fmtDate(existing.date)}. ${existing.gcalId ? "It’s taken out of Google Calendar too." : ""}${existing.entryId ? " The log entry made from it stays." : ""}`, ok: "Delete", danger: true }))) return
+    const gone = [existing, ...(scope === "later" ? later : [])]
+    if (!(await ask({ title: gone.length > 1 ? `Delete ${gone.length} shifts?` : "Delete this shift?", message: gone.length > 1 ? `This shift on ${fmtDate(existing.date)} and the ${plural(later.length, "later one")} in the repeat. ${gone.some((x) => x.gcalId) ? "They’re taken out of Google Calendar too." : ""}` : `${placeName(data, existing)} on ${fmtDate(existing.date)}. ${existing.gcalId ? "It’s taken out of Google Calendar too." : ""}${existing.entryId ? " The log entry made from it stays." : ""}`, ok: "Delete", danger: true }))) return
+    const ids = new Set(gone.map((x) => x.id))
     commit((d) => {
-      d.shifts = d.shifts.filter((s) => s.id !== existing.id)
-      if (existing.gcalId) d.shiftCal.deletes.push(existing.gcalId)
-    }, "Shift deleted")
+      d.shifts = d.shifts.filter((s) => !ids.has(s.id))
+      for (const x of gone) if (x.gcalId) d.shiftCal.deletes.push(x.gcalId)
+    }, gone.length > 1 ? `${gone.length} shifts deleted` : "Shift deleted", { undo: true })
     onClose()
   }
 
@@ -119,6 +131,18 @@ export function ShiftDialog({ draft, onClose }: { draft: ShiftDraft | null; onCl
             <span className="num font-medium">{hours > 0 ? `${hoursText(hours)} paid · ${money(shiftPay(live))}` : "Check the start and end times"}</span>
             <span className="block text-[12.5px] text-muted-foreground">{timeText(f)}{repeat !== "0" && !existing ? ` · ${repeat} shifts, ${money(shiftPay(live) * Number(repeat))} in total` : ""}</span>
           </div>
+          {existing && later.length > 0 && (
+            <div className="grid gap-1.5">
+              <span className="text-[12.5px] text-muted-foreground">This shift is part of a weekly repeat. Apply changes to</span>
+              <div role="radiogroup" aria-label="Apply changes to" className="flex flex-wrap gap-1.5">
+                {([["one", "Just this shift"], ["later", `This and ${plural(later.length, "later one")}`]] as const).map(([k, l]) => (
+                  <button key={k} type="button" role="radio" aria-checked={scope === k} onClick={() => setScope(k)}
+                    className={`rounded-full px-4 py-2 text-[13px] font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${scope === k ? "bg-foreground text-background" : "bg-secondary text-muted-foreground hover:text-foreground"}`}>{l}</button>
+                ))}
+              </div>
+              {scope === "later" && <span className="text-[12px] text-muted-foreground">Later shifts keep their own dates. Shifts already in your log aren’t changed.</span>}
+            </div>
+          )}
           {clash.length > 0 && (
             <p className="flex gap-2 rounded-xl bg-warn-tint px-4 py-3 text-[13px] text-warn">
               <AlertTriangle className="mt-0.5 size-4 flex-none" />

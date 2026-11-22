@@ -37,8 +37,11 @@ export function ExpensesTab() {
 
   async function remove(x: Expense) {
     if (!(await ask({ title: "Delete expense?", message: `Delete ${categoryName(x.category).toLowerCase()} of ${money(x.amount)} on ${fmtDate(x.date)}${x.receiptId ? " and its receipt photo" : ""}?`, ok: "Delete", danger: true }))) return
-    commit((d) => void (d.expenses = d.expenses.filter((e) => e.id !== x.id)), "Expense deleted")
-    if (x.receiptId) deleteReceipt(me.uid, x.receiptId).catch(() => {})
+    // The receipt photo is only deleted once Undo has gone
+    commit((d) => void (d.expenses = d.expenses.filter((e) => e.id !== x.id)), "Expense deleted", {
+      undo: true,
+      onExpire: () => { if (x.receiptId) deleteReceipt(me.uid, x.receiptId).catch(() => {}) },
+    })
   }
 
   async function exportYear() {
