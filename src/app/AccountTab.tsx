@@ -1,8 +1,6 @@
 import { useRef, useState } from "react"
 import { toast } from "sonner"
-import {
-  deleteUser, EmailAuthProvider, GoogleAuthProvider, reauthenticateWithCredential, reauthenticateWithPopup, sendEmailVerification, updatePassword,
-} from "firebase/auth"
+import { changePassword, confirmIdentity, deleteLogin, loginKind, resendVerification } from "@/lib/authService"
 import { CalendarDays, Copy, LogOut, Mail, MessageSquare } from "lucide-react"
 import { Label } from "@/components/ui/label"
 import { Button } from "@/components/ui/button"
@@ -20,6 +18,7 @@ import type { ConnStatus } from "@/lib/google"
 import { CONTACT_EMAIL } from "./brand"
 import { useApp } from "./ctx"
 import { InstallApp } from "./InstallApp"
+import { LockPanel, NotificationsPanel } from "./DevicePanels"
 import { AreaField, Chips, Field, Panel, Pill } from "./bits"
 import type { ThemePref } from "@/lib/theme"
 
@@ -28,7 +27,7 @@ const connLabel = (s: ConnStatus) => ({ ready: "Connected", not_connected: "Not 
 const connTone = (s: ConnStatus) => (s === "ready" ? "done" : s === "unavailable" ? "pending" : "overdue") as "done" | "pending" | "overdue"
 
 export function AccountTab() {
-  const { data, commit, me, ask, replaceAll, logOut, accountDeleted, google, connect, disconnectGoogle, settings, isAdmin, adminNeedsGoogle, openFeedback, go, theme, setTheme } = useApp()
+  const { data, commit, me, ask, askFor, replaceAll, logOut, accountDeleted, google, connect, disconnectGoogle, settings, isAdmin, adminNeedsGoogle, openFeedback, go, theme, setTheme } = useApp()
   const p = data.profile
   const restoreRef = useRef<HTMLInputElement>(null)
   const combineRef = useRef<HTMLInputElement>(null)
@@ -63,14 +62,12 @@ export function AccountTab() {
   const [pwBusy, setPwBusy] = useState(false)
   async function changePw(e: React.FormEvent) {
     e.preventDefault()
-    const u = auth.currentUser
-    if (!u?.email) return
+    if (!auth.currentUser?.email) return
     if (pwNew.length < 8) return toast.error("Use a new password of at least 8 characters.")
     if (pwNew !== pwNew2) return toast.error("The new passwords don’t match.")
     setPwBusy(true)
     try {
-      await reauthenticateWithCredential(u, EmailAuthProvider.credential(u.email, pwCur))
-      await updatePassword(u, pwNew)
+      await changePassword(pwCur, pwNew)
       setPwCur(""); setPwNew(""); setPwNew2("")
       toast.success("Password changed ✓")
     } catch (x) {
@@ -81,7 +78,7 @@ export function AccountTab() {
   }
   async function resendVerify() {
     if (!auth.currentUser) return
-    try { await sendEmailVerification(auth.currentUser); toast("Verification email sent. Check your inbox.") } catch { toast.error("Couldn’t send it right now. Try again later.") }
+    try { await resendVerification(); toast("Verification email sent. Check your inbox.") } catch { toast.error("Couldn’t send it right now. Try again later.") }
   }
 
   /* ---------- files ---------- */
@@ -161,24 +158,24 @@ export function AccountTab() {
     if (!ok) return
     const u = auth.currentUser
     if (!u) return
+    // Confirm it's them first (Firebase asks for a recent log-in), so nothing is wiped if that fails
+    try {
+      if (loginKind() === "password") {
+        const pw = await askFor({ title: "Confirm it’s you", message: "Enter your KASA.Rx password to delete your account.", ok: "Delete account", danger: true, input: { label: "Password", type: "password", autoComplete: "current-password" } })
+        if (pw === null) return
+        await confirmIdentity(pw)
+      } else await confirmIdentity()
+    } catch (x) {
+      const code = (x as { code?: string })?.code || ""
+      if (!/popup-closed|cancelled-popup/.test(code)) toast.error(/invalid-credential|wrong-password/.test(code) ? "That password isn’t right, so nothing was deleted." : "Couldn’t confirm it’s you, so nothing was deleted. Try again.")
+      return
+    }
     try {
       await wipeVault(u.uid)
       await wipeReceipts(u.uid).catch(() => {})
       await wipeOwnRecords(u.uid)
       await forgetPerson(u.uid).catch(() => {})
-      try {
-        await deleteUser(u)
-      } catch (x) {
-        if (!/requires-recent-login/.test((x as { code?: string })?.code || "")) throw x
-        // Firebase asks for a fresh log-in before deleting an account
-        if (me.viaGoogle) await reauthenticateWithPopup(u, new GoogleAuthProvider())
-        else {
-          const pw = window.prompt("To delete your account, enter your password once more:")
-          if (!pw) return toast("Your data was deleted, but the account is still there. Try again to remove it.")
-          await reauthenticateWithCredential(u, EmailAuthProvider.credential(u.email || "", pw))
-        }
-        await deleteUser(u)
-      }
+      await deleteLogin()
       accountDeleted()
     } catch {
       toast.error("The account couldn’t be deleted. Check your connection and try again.")
@@ -209,6 +206,10 @@ export function AccountTab() {
       )}
 
       <InstallApp />
+
+      <LockPanel />
+
+      <NotificationsPanel />
 
       <Panel title="Appearance">
         <Chips<ThemePref> label="Appearance" value={theme} onChange={setTheme} options={[["dark", "Dark"], ["light", "Light"], ["system", "Match my device"]]} />

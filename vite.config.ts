@@ -12,7 +12,7 @@ export default defineConfig({
     // through Firestore's own cache, so the service worker never touches Firebase or Google requests.
     VitePWA({
       registerType: "autoUpdate",
-      includeAssets: ["favicon.svg", "apple-touch-icon.png"],
+      includeAssets: ["favicon.svg", "apple-touch-icon.png", "reminders-sw.js"],
       manifest: {
         name: "KASA.Rx · Pharmacy service tracker",
         short_name: "KASA.Rx",
@@ -29,6 +29,8 @@ export default defineConfig({
         ],
       },
       workbox: {
+        // Reminder notifications (see src/lib/reminders.ts)
+        importScripts: ["reminders-sw.js"],
         // Everything needed to open and use the tracker offline (the big export library loads when used)
         globPatterns: ["**/*.{js,css,html,svg,png,woff2}"],
         globIgnores: ["**/exceljs*.js", "**/html2canvas*.js"],

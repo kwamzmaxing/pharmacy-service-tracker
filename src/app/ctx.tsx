@@ -23,6 +23,8 @@ export type AskOptions = {
   danger?: boolean
   /** Ask the viewer to type this exact word before the confirm button works. */
   typeToConfirm?: string
+  /** Ask for a value (for example a password); askFor resolves with it. */
+  input?: { label: string; type?: "password" | "text"; autoComplete?: string }
 }
 
 export type AppApi = {
@@ -32,6 +34,8 @@ export type AppApi = {
   commit: (fn: (d: Data) => void, message?: string, opts?: CommitOptions) => void
   replaceAll: (d: Data, message?: string) => void
   ask: (o: AskOptions) => Promise<boolean>
+  /** Like ask, with a box to type into: resolves with what was typed, or null if cancelled. */
+  askFor: (o: AskOptions & { input: NonNullable<AskOptions["input"]> }) => Promise<string | null>
   /** Open a section; for the log, optionally which form to start on. */
   go: (t: Tab, logMode?: LogMode) => void
   logMode: LogMode

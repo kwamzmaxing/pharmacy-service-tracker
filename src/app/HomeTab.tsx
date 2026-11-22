@@ -2,7 +2,7 @@
 import type { ReactNode } from "react"
 import { ArrowRight, CalendarDays, Calculator, Car, ChartPie, Clock, FileText, Pill as PillIcon, Plus, Receipt, Settings, Store } from "lucide-react"
 import { cn } from "@/lib/utils"
-import { entryAmt, fmtDate, followUpsDue, invStatus, money, monthly, plural, qtyText, taxSummary, unitOf } from "@/lib/model"
+import { entryAmt, fmtDate, followUpsDue, invStatus, money, monthly, plural, qtyText, taxSummary, today, unitOf } from "@/lib/model"
 import { useApp, type Tab } from "./ctx"
 import { placeName, shiftPay, toLog, upcoming } from "@/lib/shifts"
 import { Ledger, Panel } from "./bits"
@@ -46,6 +46,9 @@ export function HomeTab() {
   if (due.length) todo.push({ tone: "danger", text: `${plural(due.length, "invoice")} ready for a payment reminder.`, cta: "Send follow-ups", act: showFollowUps })
   else if (overdue.length) todo.push({ tone: "danger", text: `${plural(overdue.length, "invoice")} overdue (${money(overdue.reduce((a, i) => a + i.total, 0))}).`, cta: "See invoices", act: () => go("invoices") })
   const shiftsDone = toLog(data)
+  // The next shift if it starts within a day (also sent as a reminder notification where possible)
+  const soon = upcoming(data).find((s) => { const ms = new Date(`${s.date}T${s.start}:00`).getTime() - Date.now(); return ms > 0 && ms < 86_400_000 })
+  if (soon) todo.push({ tone: "info", text: `Next shift: ${placeName(data, soon)} at ${soon.start}${soon.date === today() ? " today" : " tomorrow"}.`, cta: "See shifts", act: () => go("shifts") })
   if (shiftsDone.length) todo.push({ tone: "warn", text: `${plural(shiftsDone.length, "finished shift")} not in your log yet.`, cta: "Review shifts", act: () => go("shifts") })
   if (unbilledTotal > 0) todo.push({ tone: "warn", text: `${money(unbilledTotal)} of logged work isn’t on an invoice yet.`, cta: "Create invoice", act: () => go("summary") })
   const missing = [!p.fullName && "your name", !(p.sortCode && p.accountNumber) && "bank details"].filter(Boolean)

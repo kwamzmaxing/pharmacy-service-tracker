@@ -1,6 +1,7 @@
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { toast } from "sonner"
-import { onAuthStateChanged, signOut, type User } from "firebase/auth"
+import { onAuthStateChanged, type User } from "firebase/auth"
+import { logOut } from "@/lib/authService"
 import { CalendarDays, Calculator, ChartPie, Ellipsis, FileText, House, LogOut, MessageSquare, NotebookPen, Receipt, Settings as SettingsIcon, ShieldCheck, Store, Monitor, Moon, Sun, UserRound } from "lucide-react"
 import { Toaster } from "@/components/ui/sonner"
 import { Button } from "@/components/ui/button"
@@ -16,6 +17,9 @@ import { AppCtx, type AppApi, type AskOptions, type EmailKind, type LogMode, typ
 import { ConfirmDialog, EmailDialog, FeedbackDialog, FollowUpDialog, InvoiceDialog } from "@/app/dialogs"
 import { AuthScreen } from "@/app/AuthScreen"
 import { setErrorPage } from "@/lib/errors"
+import { lockSettings } from "@/lib/appLock"
+import { buildReminders, notifyPrefs, syncReminders } from "@/lib/reminders"
+import { LockScreen } from "@/app/LockScreen"
 import { BRAND, CONTACT_EMAIL, PRIVACY_URL, TAGLINE, Wordmark } from "@/app/brand"
 import { LogTab } from "@/app/LogTab"
 import { HomeTab } from "@/app/HomeTab"
@@ -119,6 +123,18 @@ export default function App() {
   const [tab, setTab] = useState<Tab>("home")
   const [logMode, setLogMode] = useState<LogMode>("service")
   const [welcome, setWelcome] = useState(false)
+  // Face ID / fingerprint lock: locked when the app opens, and again after it's been in the background a while
+  const [locked, setLocked] = useState(false)
+  const hiddenAt = useRef(0)
+  useEffect(() => {
+    const on = () => {
+      if (document.visibilityState === "hidden") { hiddenAt.current = Date.now(); return }
+      const s = me ? lockSettings(me.uid) : null
+      if (s && hiddenAt.current && Date.now() - hiddenAt.current >= s.afterMins * 60_000) setLocked(true)
+    }
+    document.addEventListener("visibilitychange", on)
+    return () => document.removeEventListener("visibilitychange", on)
+  }, [me])
   useEffect(() => { setErrorPage(tab) }, [tab])
   const [invoiceView, setInvoiceView] = useState<{ id: string; justCreated: boolean } | null>(null)
   const [emailReq, setEmailReq] = useState<{ id: string; kind: EmailKind; fromFollowUps: boolean } | null>(null)
@@ -142,13 +158,14 @@ export default function App() {
   const [settings, setSettings] = useState<PublicSettings | null>(null)
   const [outbox, setOutbox] = useState<OutboxItem[]>([])
   const [askReq, setAskReq] = useState<AskOptions | null>(null)
-  const askResolve = useRef<((v: boolean) => void) | null>(null)
+  const askResolve = useRef<((ok: boolean, value: string) => void) | null>(null)
   const dataRef = useRef<Data | null>(null)
   const vaultRef = useRef<Vault | null>(null)
   const unwatch = useRef<(() => void) | null>(null)
   const lastProblem = useRef(0)
 
-  const ask = useCallback((o: AskOptions) => new Promise<boolean>((res) => { askResolve.current = res; setAskReq(o) }), [])
+  const ask = useCallback((o: AskOptions) => new Promise<boolean>((res) => { askResolve.current = (ok) => res(ok); setAskReq(o) }), [])
+  const askFor = useCallback((o: AskOptions) => new Promise<string | null>((res) => { askResolve.current = (ok, v) => res(ok ? v : null); setAskReq(o) }), [])
   const onProblem = useCallback((p: SaveProblem) => {
     if (Date.now() - lastProblem.current < 5000) return
     lastProblem.current = Date.now()
@@ -184,6 +201,7 @@ export default function App() {
     setMe(m)
     setTab("home")
     setWelcome(isNew)
+    setLocked(!!lockSettings(u.uid))
     setPhase("ready")
     if (followUpsDue(d).length) setTimeout(() => setFollowOpen(true), 400)
     recordPerson(u.uid, { name: d.profile.fullName || m.name, email: m.email, isNew }).catch(() => {})
@@ -235,6 +253,14 @@ export default function App() {
     }
   }, [me])
   useEffect(() => { if (phase === "ready") refreshOutbox() }, [phase, refreshOutbox])
+  // Reminders: hand the latest list to the service worker when data changes, and every 5 minutes while open
+  useEffect(() => {
+    if (phase !== "ready" || !data) return
+    const run = () => { const p = notifyPrefs(); if (p.on) syncReminders(buildReminders(data, p), true) }
+    run()
+    const t = setInterval(run, 5 * 60_000)
+    return () => clearInterval(t)
+  }, [phase, data])
   // Fetch the other sections in the background once the tracker is open, so they still open with no signal later
   useEffect(() => {
     if (phase !== "ready") return
@@ -283,12 +309,24 @@ export default function App() {
     if (message) toast(message)
   }, [])
   const go = useCallback((t: Tab, mode: LogMode = "service") => { setWelcome(false); setLogMode(mode); setTab(t); setClientView(null); window.scrollTo({ top: 0 }) }, [])
+  // Tapping a notification opens the right section
+  useEffect(() => {
+    if (!("serviceWorker" in navigator)) return
+    const on = (e: MessageEvent) => { const t = e.data?.kasaGo; if (t === "invoices" || t === "shifts") go(t) }
+    navigator.serviceWorker.addEventListener("message", on)
+    return () => navigator.serviceWorker.removeEventListener("message", on)
+  }, [go])
+  useEffect(() => {
+    if (phase !== "ready") return
+    const h = location.hash.slice(1)
+    if (h === "invoices" || h === "shifts") { go(h); history.replaceState(null, "", location.pathname + location.search) }
+  }, [phase, go])
   const leave = useCallback(async (notice: string) => {
     setInvoiceView(null); setEmailReq(null); setFollowOpen(false); setFeedbackOpen(false); setOutbox([])
     disconnect()
     refreshGoogle()
     setAuthNotice(notice)
-    await signOut(auth).catch(() => {})
+    await logOut().catch(() => {})
   }, [])
   const connect = useCallback(async (area: GoogleArea) => {
     try {
@@ -306,7 +344,7 @@ export default function App() {
   const api = useMemo<AppApi | null>(() => {
     if (!data || !me) return null
     return {
-      data, me, commit, replaceAll, ask, go, google, connect, isAdmin: admin, adminNeedsGoogle, settings, setSettings, outbox, refreshOutbox, theme, setTheme, logMode,
+      data, me, commit, replaceAll, ask, askFor, go, google, connect, isAdmin: admin, adminNeedsGoogle, settings, setSettings, outbox, refreshOutbox, theme, setTheme, logMode,
       disconnectGoogle: () => { disconnect(); refreshGoogle(); toast("Google disconnected on this device") },
       viewInvoice: (id, justCreated = false) => setInvoiceView({ id, justCreated }),
       openClient: (id) => { setClientView(id); setTab("clients"); window.scrollTo({ top: 0 }) },
@@ -317,9 +355,9 @@ export default function App() {
       logOut: () => leave("You’ve logged out."),
       accountDeleted: () => leave("Your account was deleted."),
     }
-  }, [data, me, commit, replaceAll, ask, go, google, connect, admin, settings, outbox, refreshOutbox, leave, clientView, theme, setTheme, logMode, adminNeedsGoogle])
+  }, [data, me, commit, replaceAll, ask, askFor, go, google, connect, admin, settings, outbox, refreshOutbox, leave, clientView, theme, setTheme, logMode, adminNeedsGoogle])
 
-  const confirm = <ConfirmDialog req={askReq} onDone={(ok) => { askResolve.current?.(ok); askResolve.current = null; setAskReq(null) }} />
+  const confirm = <ConfirmDialog req={askReq} onDone={(ok, value) => { askResolve.current?.(ok, value); askResolve.current = null; setAskReq(null) }} />
   const toaster = <Toaster theme={resolvedTheme} position="bottom-center" mobileOffset={{ bottom: "calc(84px + env(safe-area-inset-bottom))" }} toastOptions={{ style: { fontFamily: "Inter, system-ui, sans-serif", borderRadius: 14 } }} />
 
   if (!isConfigured)
@@ -328,6 +366,7 @@ export default function App() {
     return <><Splash message="Your tracker can’t be reached right now. Check your connection and try again."><div><Button onClick={() => auth.currentUser && openUser(auth.currentUser)}>Try again</Button></div></Splash>{toaster}</>
   if (phase === "auth") return <><AuthScreen notice={authNotice} />{toaster}</>
   if (phase !== "ready" || !api || !data || !me) return <Splash message={phase === "loading" ? "Opening your tracker…" : "Starting…"} />
+  if (locked) return <><LockScreen uid={me.uid} onUnlocked={() => setLocked(false)} onLogOut={() => { setLocked(false); leave("You’ve logged out.") }} />{toaster}</>
 
   const name = data.profile.fullName || me.name || me.email
   const due = followUpsDue(data).length
