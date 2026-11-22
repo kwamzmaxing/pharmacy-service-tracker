@@ -1,12 +1,8 @@
 import { useEffect, useRef, useState } from "react"
-import {
-  browserLocalPersistence, browserSessionPersistence, createUserWithEmailAndPassword, GoogleAuthProvider,
-  sendEmailVerification, sendPasswordResetEmail, setPersistence, signInWithEmailAndPassword, signInWithPopup, updateProfile,
-} from "firebase/auth"
+import { createAccount, logInWith, logInWithEmail, sendPasswordReset } from "@/lib/authService"
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
 import { cn } from "@/lib/utils"
-import { auth } from "@/lib/firebase"
 import { Field } from "./bits"
 import { Wordmark } from "./brand"
 
@@ -41,9 +37,6 @@ export function AuthScreen({ notice }: { notice?: string }) {
   useEffect(() => { setErr(""); fields.current?.querySelector("input")?.focus() }, [mode])
   useEffect(() => setInfo(notice || ""), [notice])
 
-  async function remember() {
-    await setPersistence(auth, keep ? browserLocalPersistence : browserSessionPersistence)
-  }
   async function submit(e: React.FormEvent) {
     e.preventDefault()
     setErr("")
@@ -55,20 +48,17 @@ export function AuthScreen({ notice }: { notice?: string }) {
     setBusy(true)
     try {
       if (mode === "forgot") {
-        await sendPasswordResetEmail(auth, email.trim())
+        await sendPasswordReset(email.trim())
         setInfo(`If ${email.trim()} has an account, a reset link is on its way. Check your inbox and spam folder.`)
         setMode("in")
         return
       }
-      await remember()
       if (mode === "up") {
         // Set before creating: the app opens the account as soon as Firebase reports the log-in
         sessionStorage.setItem("pst_new_name", name.trim())
-        const cred = await createUserWithEmailAndPassword(auth, email.trim(), pw)
-        updateProfile(cred.user, { displayName: name.trim() }).catch(() => {})
-        sendEmailVerification(cred.user).catch(() => {})
+        await createAccount(name.trim(), email.trim(), pw, keep)
       } else {
-        await signInWithEmailAndPassword(auth, email.trim(), pw)
+        await logInWithEmail(email.trim(), pw, keep)
       }
     } catch (x) {
       const code = (x as { code?: string })?.code || ""
@@ -86,8 +76,7 @@ export function AuthScreen({ notice }: { notice?: string }) {
     setErr("")
     setBusy(true)
     try {
-      await remember()
-      await signInWithPopup(auth, new GoogleAuthProvider())
+      await logInWith("google", keep)
     } catch (x) {
       setErr(message((x as { code?: string })?.code || ""))
     } finally {

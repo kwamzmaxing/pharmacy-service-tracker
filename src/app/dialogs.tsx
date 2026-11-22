@@ -21,7 +21,7 @@ import { Pill } from "./bits"
 const STATUS_LABEL = { paid: "Paid", unpaid: "Unpaid", overdue: "Overdue" } as const
 
 /* ---------- confirm ---------- */
-export function ConfirmDialog({ req: live, onDone }: { req: AskOptions | null; onDone: (ok: boolean) => void }) {
+export function ConfirmDialog({ req: live, onDone }: { req: AskOptions | null; onDone: (ok: boolean, value: string) => void }) {
   const [typed, setTyped] = useState("")
   // keep showing the last request while the dialog animates closed
   const [shown, setShown] = useState<AskOptions | null>(live)
@@ -30,9 +30,10 @@ export function ConfirmDialog({ req: live, onDone }: { req: AskOptions | null; o
     setTyped("")
   }, [live])
   const req = shown
-  const ready = !req?.typeToConfirm || typed.trim() === req.typeToConfirm
+  const ready = req?.input ? typed.length > 0 : !req?.typeToConfirm || typed.trim() === req.typeToConfirm
+  const done = (ok: boolean) => onDone(ok, typed)
   return (
-    <Dialog open={!!live} onOpenChange={(o) => !o && onDone(false)}>
+    <Dialog open={!!live} onOpenChange={(o) => !o && done(false)}>
       <DialogContent className="max-w-md rounded-2xl">
         <DialogHeader>
           <DialogTitle className="font-display">{req?.title}</DialogTitle>
@@ -41,12 +42,18 @@ export function ConfirmDialog({ req: live, onDone }: { req: AskOptions | null; o
         {req?.typeToConfirm && (
           <div className="grid gap-1.5">
             <Label htmlFor="confirm-type" className="text-[12.5px] font-normal text-muted-foreground">Type {req.typeToConfirm} to confirm</Label>
-            <Input id="confirm-type" autoComplete="off" value={typed} onChange={(e) => setTyped(e.target.value)} onKeyDown={(e) => e.key === "Enter" && ready && onDone(true)} />
+            <Input id="confirm-type" autoComplete="off" value={typed} onChange={(e) => setTyped(e.target.value)} onKeyDown={(e) => e.key === "Enter" && ready && done(true)} />
+          </div>
+        )}
+        {req?.input && (
+          <div className="grid gap-1.5">
+            <Label htmlFor="confirm-input" className="text-[12.5px] font-normal text-muted-foreground">{req.input.label}</Label>
+            <Input id="confirm-input" type={req.input.type || "text"} autoComplete={req.input.autoComplete || "off"} autoFocus value={typed} onChange={(e) => setTyped(e.target.value)} onKeyDown={(e) => e.key === "Enter" && ready && done(true)} />
           </div>
         )}
         <DialogFooter className="gap-2">
-          <Button variant="outline" onClick={() => onDone(false)}>Cancel</Button>
-          <Button variant={req?.danger ? "destructive" : "default"} disabled={!ready} onClick={() => onDone(true)}>{req?.ok || "Continue"}</Button>
+          <Button variant="outline" onClick={() => done(false)}>Cancel</Button>
+          <Button variant={req?.danger ? "destructive" : "default"} disabled={!ready} onClick={() => done(true)}>{req?.ok || "Continue"}</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

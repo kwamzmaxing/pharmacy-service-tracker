@@ -1,12 +1,12 @@
 import { useCallback, useEffect, useState } from "react"
 import { toast } from "sonner"
-import { sendPasswordResetEmail } from "firebase/auth"
+import { sendPasswordReset } from "@/lib/authService"
 import { Copy, ExternalLink, RefreshCw, Send, Sheet, Star } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Switch } from "@/components/ui/switch"
 import { cn } from "@/lib/utils"
 import { fmtDate, isoOf } from "@/lib/model"
-import { auth } from "@/lib/firebase"
+
 import { listFeedback, listOutbox, listPeople, markOutbox, saveSettings, type Feedback, type OutboxItem, type Person, type PublicSettings } from "@/lib/cloud"
 import { GOOGLE_HELP, GoogleError, sendMail, writeSheet } from "@/lib/google"
 import { useApp } from "./ctx"
@@ -83,7 +83,7 @@ export function AdminTab() {
   async function resetFor(p: Person) {
     setBusy("reset-" + p.uid)
     try {
-      await sendPasswordResetEmail(auth, p.email)
+      await sendPasswordReset(p.email)
       toast.success(`Password-reset link sent to ${p.email}`)
     } catch {
       toast.error("Couldn’t send the reset link. Check the address and your connection.")

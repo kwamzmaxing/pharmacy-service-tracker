@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react"
 import { toast } from "sonner"
-import { Camera, Download, Plus, Receipt, Trash2, X } from "lucide-react"
+import { Camera, Download, Image as ImageIcon, Plus, Receipt, Trash2, X } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
@@ -185,6 +185,7 @@ function ExpenseForm({ onDone }: { onDone: () => void }) {
   const [photo, setPhoto] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const fileRef = useRef<HTMLInputElement>(null)
+  const libraryRef = useRef<HTMLInputElement>(null)
   // Link to the shift that day: pick the pharmacy you logged work for on that date
   useEffect(() => { setClientId((c) => c || shiftClient(date)) }, [date]) // eslint-disable-line react-hooks/exhaustive-deps
   const worked = data.entries.some((e) => e.date === date)
@@ -247,14 +248,19 @@ function ExpenseForm({ onDone }: { onDone: () => void }) {
           )}
         </div>
         <div className="flex flex-wrap items-center gap-3">
+          {/* Phones: "Take photo" opens the back camera straight away; "Choose photo" picks one already taken */}
           <input ref={fileRef} id="x-photo" type="file" accept="image/*" capture="environment" hidden onChange={(e) => { pick(e.target.files?.[0]); e.target.value = "" }} />
+          <input ref={libraryRef} id="x-photo-lib" type="file" accept="image/*" hidden onChange={(e) => { pick(e.target.files?.[0]); e.target.value = "" }} />
           {photo ? (
             <div className="flex items-center gap-3">
               <img src={photo} alt="Receipt preview" className="h-16 w-12 rounded border object-cover" />
               <Button type="button" variant="ghost" size="sm" onClick={() => setPhoto(null)}>Remove photo</Button>
             </div>
           ) : (
-            <Button type="button" variant="outline" onClick={() => fileRef.current?.click()}><Camera /> Add receipt photo</Button>
+            <>
+              <Button type="button" variant="outline" onClick={() => fileRef.current?.click()}><Camera /> Take photo of receipt</Button>
+              <Button type="button" variant="ghost" onClick={() => libraryRef.current?.click()}><ImageIcon /> Choose a photo</Button>
+            </>
           )}
         </div>
         <div className="flex gap-2 pt-1">
