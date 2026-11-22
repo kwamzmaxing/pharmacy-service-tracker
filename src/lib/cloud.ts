@@ -87,9 +87,12 @@ export async function recordPerson(uid: string, p: { name: string; email: string
 export const forgetPerson = (uid: string) => deleteDoc(doc(db, "users", uid))
 /** Everything else stored under this person's ID: feedback, emails queued for the admin, the daily email count, crash reports. */
 export async function wipeOwnRecords(uid: string) {
+  // Each part on its own, so one failure (for example older database rules) never stops the account being deleted
   for (const c of ["feedback", "outbox", "errors"]) {
-    const snap = await getDocs(query(collection(db, c), where("uid", "==", uid)))
-    await Promise.all(snap.docs.map((d) => deleteDoc(d.ref)))
+    try {
+      const snap = await getDocs(query(collection(db, c), where("uid", "==", uid)))
+      await Promise.all(snap.docs.map((d) => deleteDoc(d.ref).catch(() => {})))
+    } catch { /* not allowed or offline: carry on */ }
   }
   await deleteDoc(doc(db, "outboxQuota", uid)).catch(() => {})
 }
