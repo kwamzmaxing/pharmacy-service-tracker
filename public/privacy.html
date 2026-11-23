@@ -12,14 +12,14 @@
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@100..125,400..700&family=Inter:wght@400..700&display=swap" rel="stylesheet" />
 <style>
-  :root, [data-theme="light"] { --bg: #f1f1f5; --card: #ffffff; --fg: #171721; --muted: #5d5d6e; --line: #e2e2ea; --accent: #3a4fd6; }
-  [data-theme="dark"] { --bg: #171721; --card: #1e1e2a; --fg: #ececf3; --muted: #aeaeb8; --line: #2c2c3a; --accent: #a5b0f7; }
+  :root, [data-theme="light"] { --bg: #f1f1f5; --card: #ffffff; --fg: #171721; --muted: #5d5d6e; --line: #e2e2ea; --accent: #3a4fd6; --teal: #0f7a73; }
+  [data-theme="dark"] { --bg: #171721; --card: #1e1e2a; --fg: #ececf3; --muted: #aeaeb8; --line: #2c2c3a; --accent: #a5b0f7; --teal: #5cc6bb; }
   * { box-sizing: border-box; }
   body { margin: 0; background: var(--bg); color: var(--fg); font: 15.5px/1.65 Inter, system-ui, sans-serif; -webkit-font-smoothing: antialiased; }
   .wrap { max-width: 760px; margin: 0 auto; padding: 0 16px; }
   header { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 20px 0; }
   .brand { display: flex; align-items: center; gap: 12px; color: inherit; text-decoration: none; font-family: Archivo, Inter, sans-serif; font-stretch: 118%; font-weight: 500; font-size: 17px; }
-  .mark { display: flex; width: 36px; height: 36px; align-items: center; justify-content: center; border-radius: 9px; background: var(--card); font-size: 20px; }
+  .mark { display: flex; width: 36px; height: 36px; align-items: center; justify-content: center; border-radius: 9px; background: #F4F4F2; }
   .back { color: var(--muted); text-decoration: none; font-size: 14px; border-radius: 999px; padding: 8px 16px; background: var(--card); }
   .back:hover { color: var(--fg); }
   h1, h2 { font-family: Archivo, Inter, sans-serif; font-stretch: 118%; font-weight: 500; letter-spacing: .01em; line-height: 1.2; }
@@ -44,7 +44,7 @@
 <body>
 <div class="wrap">
   <header>
-    <a class="brand" href="./"><span class="mark" aria-hidden="true">℞</span><span>KASA<span style="color:var(--accent)">.Rx</span></span></a>
+    <a class="brand" href="./"><span class="mark" aria-hidden="true"><img src="logo-mark.svg" alt="" width="26" height="26"></span><span>KASA<span style="color:var(--teal)">.Rx</span></span></a>
     <a class="back" href="./">Back to the tracker</a>
   </header>
 

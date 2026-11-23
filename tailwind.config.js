@@ -13,6 +13,7 @@ module.exports = {
       },
       colors: {
         "brand-ink": "hsl(var(--brand-ink))",
+        "brand-teal": "hsl(var(--brand-teal))",
         field: "hsl(var(--field))",
         header: { DEFAULT: "hsl(var(--header))", fg: "hsl(var(--header-fg))", muted: "hsl(var(--header-muted))" },
         warn: { DEFAULT: "hsl(var(--warn))", tint: "hsl(var(--warn-tint))" },

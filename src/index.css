@@ -27,6 +27,8 @@
     --ring: 232 79% 62%;
     --radius: 0.75rem;
     --brand-ink: 232 62% 50%;
+    /* The teal from the KASA.Rx logo, darkened/lightened so text stays readable */
+    --brand-teal: 176 78% 27%;
     --field: 240 20% 98%;
     --header: 240 18% 95%;
     --header-fg: 240 18% 11%;
@@ -71,6 +73,7 @@
     --input: 240 6% 34%;
     --ring: 232 82% 68%;
     --brand-ink: 232 85% 78%;
+    --brand-teal: 174 55% 55%;
     --field: 240 18% 12%;
     --header: 240 18% 11%;
     --header-fg: 240 20% 94%;
