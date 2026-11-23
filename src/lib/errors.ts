@@ -9,9 +9,13 @@ const sent = new Set<string>()
 let page = "start"
 export const setErrorPage = (p: string) => { page = p }
 
-export function reportError(err: unknown, where = "") {
+export function reportError(err: unknown, where = "", source = "") {
   try {
-    const e = err instanceof Error ? err : new Error(typeof err === "string" ? err : JSON.stringify(err)?.slice(0, 300) || "Unknown error")
+    const real = err instanceof Error
+    const e = real ? err : new Error(typeof err === "string" ? err : JSON.stringify(err)?.slice(0, 300) || "Unknown error")
+    // A failure in another website's script (Google sign-in, a browser extension, a content blocker):
+    // the browser hides everything but "Script error.", so there's nothing to report or fix here
+    if (!real && /^Script error\.?$/i.test(e.message)) return
     const message = (where ? `[${where}] ` : "") + (e.message || String(e))
     // Network blips and browser extensions aren't bugs in the tracker
     if (/Failed to fetch|NetworkError|Load failed|ResizeObserver loop|chrome-extension:|moz-extension:/i.test(message + (e.stack || ""))) return
@@ -21,7 +25,8 @@ export function reportError(err: unknown, where = "") {
     addDoc(collection(db, "errors"), {
       at: new Date().toISOString(),
       message: message.slice(0, 500),
-      stack: (e.stack || "").slice(0, 2000),
+      // Only a real error's own stack; otherwise the file and line the browser gave (never this reporter's)
+      stack: (real ? e.stack || "" : source).slice(0, 2000),
       page: page.slice(0, 60),
       ua: navigator.userAgent.slice(0, 200),
       uid,
@@ -31,7 +36,7 @@ export function reportError(err: unknown, where = "") {
 }
 
 export function watchErrors() {
-  window.addEventListener("error", (e) => reportError(e.error || e.message))
+  window.addEventListener("error", (e) => reportError(e.error || e.message, "", e.filename ? `${e.filename}:${e.lineno}:${e.colno}` : ""))
   window.addEventListener("unhandledrejection", (e) => reportError(e.reason, "promise"))
 }
 
