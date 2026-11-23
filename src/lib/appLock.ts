@@ -41,7 +41,7 @@ export async function enableLock(uid: string, email: string, name: string) {
     },
   })) as PublicKeyCredential | null
   if (!cred) throw new Error("cancelled")
-  localStorage.setItem(key(uid), JSON.stringify({ credentialId: b64(cred.rawId), afterMins: 1 } satisfies LockSettings))
+  localStorage.setItem(key(uid), JSON.stringify({ credentialId: b64(cred.rawId), afterMins: 5 } satisfies LockSettings))
 }
 
 /** Ask for Face ID, fingerprint or PIN. Resolves true when the person passes. */

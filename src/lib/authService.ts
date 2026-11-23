@@ -2,7 +2,7 @@
 // (for example a native Google or Apple sign-in) by changing only this file.
 import {
   browserLocalPersistence, browserSessionPersistence, createUserWithEmailAndPassword, deleteUser, EmailAuthProvider,
-  GoogleAuthProvider, OAuthProvider, reauthenticateWithCredential, reauthenticateWithPopup, sendEmailVerification,
+  GoogleAuthProvider, linkWithPopup, OAuthProvider, reauthenticateWithCredential, reauthenticateWithPopup, sendEmailVerification,
   sendPasswordResetEmail, setPersistence, signInWithEmailAndPassword, signInWithPopup, signOut, updatePassword, updateProfile,
   type User,
 } from "firebase/auth"
@@ -50,6 +50,17 @@ export async function confirmIdentity(password?: string) {
   const k = loginKind()
   if (k === "google" || k === "microsoft") await reauthenticateWithPopup(u, providerFor(k))
   else await reauthenticateWithCredential(u, EmailAuthProvider.credential(u.email || "", password || ""))
+}
+/**
+ * Switch this session to Google without logging out: links Google to the account the first time, or asks
+ * Google to confirm it's them (which can use a Google passkey). Admin access needs a Google session.
+ */
+export async function switchToGoogle() {
+  const u = auth.currentUser
+  if (!u) throw new Error("Not logged in")
+  if (u.providerData.some((x) => x.providerId === "google.com")) await reauthenticateWithPopup(u, new GoogleAuthProvider())
+  else await linkWithPopup(u, new GoogleAuthProvider())
+  return (await u.getIdTokenResult(true)).signInProvider
 }
 export async function changePassword(current: string, next: string) {
   const u = auth.currentUser
