@@ -57,6 +57,8 @@ export type AppApi = {
   isAdmin: boolean
   /** This account is an admin, but logged in without Google, so admin is switched off for now. */
   adminNeedsGoogle: boolean
+  /** Check admin access again (after switching this session to Google). */
+  recheckAdmin: () => Promise<void>
   settings: PublicSettings | null
   setSettings: (s: PublicSettings | null) => void
   theme: ThemePref

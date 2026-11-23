@@ -1,7 +1,7 @@
 import { useRef, useState } from "react"
 import { toast } from "sonner"
-import { changePassword, confirmIdentity, deleteLogin, loginKind, resendVerification } from "@/lib/authService"
-import { CalendarDays, Copy, LogOut, Mail, MessageSquare } from "lucide-react"
+import { changePassword, confirmIdentity, deleteLogin, loginKind, resendVerification, switchToGoogle } from "@/lib/authService"
+import { CalendarDays, Copy, LogOut, Mail, MessageSquare, ShieldCheck } from "lucide-react"
 import { Label } from "@/components/ui/label"
 import { Button } from "@/components/ui/button"
 import { Switch } from "@/components/ui/switch"
@@ -27,7 +27,7 @@ const connLabel = (s: ConnStatus) => ({ ready: "Connected", not_connected: "Not 
 const connTone = (s: ConnStatus) => (s === "ready" ? "done" : s === "unavailable" ? "pending" : "overdue") as "done" | "pending" | "overdue"
 
 export function AccountTab() {
-  const { data, commit, me, ask, askFor, replaceAll, logOut, accountDeleted, google, connect, disconnectGoogle, settings, isAdmin, adminNeedsGoogle, openFeedback, go, theme, setTheme } = useApp()
+  const { data, commit, me, ask, askFor, replaceAll, logOut, accountDeleted, google, connect, disconnectGoogle, settings, isAdmin, adminNeedsGoogle, recheckAdmin, openFeedback, go, theme, setTheme } = useApp()
   const p = data.profile
   const restoreRef = useRef<HTMLInputElement>(null)
   const combineRef = useRef<HTMLInputElement>(null)
@@ -199,9 +199,23 @@ export function AccountTab() {
       {adminNeedsGoogle && (
         <Panel title="Admin is switched off">
           <p className="max-w-[62ch] text-[13px] text-muted-foreground">
-            This account has admin access, but only after logging in with Google, so your Google 2-Step Verification protects it. Log out, then choose <b className="font-medium text-foreground">Continue with Google</b> with {me.email}.
+            This account has admin access, but it only switches on when you’ve signed in with Google this session, so your Google security (2-Step Verification or a Google passkey) protects it. You logged in another way, for example with your password. The app lock on this device doesn’t count, because it never leaves your phone.
           </p>
-          <Button className="mt-3" variant="outline" onClick={logOut}><LogOut /> Log out</Button>
+          <p className="mt-2 max-w-[62ch] text-[13px] text-muted-foreground">Confirm with Google to switch admin on now. You stay logged in. Choose the Google account for {me.email}.</p>
+          <Button className="mt-3" onClick={async () => {
+            try {
+              const via = await switchToGoogle()
+              await recheckAdmin()
+              if (via === "google.com") toast.success("Admin is on ✓")
+            } catch (x) {
+              const code = (x as { code?: string })?.code || ""
+              if (/popup-closed|cancelled-popup/.test(code)) return
+              toast.error(/user-mismatch/.test(code) ? `That’s a different Google account. Choose the one for ${me.email}.`
+                : /credential-already-in-use|email-already-in-use/.test(code) ? "That Google account is already used by another KASA.Rx account. Log out and use Continue with Google instead."
+                : /popup-blocked/.test(code) ? "Your browser blocked the Google window. Allow pop-ups for this site and try again."
+                : "Couldn’t switch to Google. Try again, or log out and choose Continue with Google.")
+            }
+          }}><ShieldCheck /> Switch admin on with Google</Button>
         </Panel>
       )}
 

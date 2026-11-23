@@ -155,6 +155,14 @@ export default function App() {
   const [google, setGoogle] = useState<Record<GoogleArea, ConnStatus>>({ gmail: googleStatus("gmail"), calendar: googleStatus("calendar"), sheets: googleStatus("sheets") })
   const [admin, setAdmin] = useState(false)
   const [adminNeedsGoogle, setAdminNeedsGoogle] = useState(false)
+  /** Admin counts only in a Google session (the database rules check the same thing). */
+  const recheckAdmin = useCallback(async () => {
+    const u = auth.currentUser
+    if (!u) return
+    const [has, via] = await Promise.all([checkAdmin(u.uid), u.getIdTokenResult(true).then((t) => t.signInProvider).catch(() => null)])
+    setAdmin(has && via === "google.com")
+    setAdminNeedsGoogle(has && via !== "google.com")
+  }, [])
   const [settings, setSettings] = useState<PublicSettings | null>(null)
   const [outbox, setOutbox] = useState<OutboxItem[]>([])
   const [askReq, setAskReq] = useState<AskOptions | null>(null)
@@ -211,10 +219,7 @@ export default function App() {
       setData(next)
     })
     // Admin only counts after logging in with Google (the database rules check the same thing)
-    Promise.all([checkAdmin(u.uid), u.getIdTokenResult().then((t) => t.signInProvider).catch(() => null)]).then(([has, via]) => {
-      setAdmin(has && via === "google.com")
-      setAdminNeedsGoogle(has && via !== "google.com")
-    })
+    recheckAdmin()
     getSettings().then(setSettings)
   }, [onProblem])
 
@@ -344,7 +349,7 @@ export default function App() {
   const api = useMemo<AppApi | null>(() => {
     if (!data || !me) return null
     return {
-      data, me, commit, replaceAll, ask, askFor, go, google, connect, isAdmin: admin, adminNeedsGoogle, settings, setSettings, outbox, refreshOutbox, theme, setTheme, logMode,
+      data, me, commit, replaceAll, ask, askFor, go, google, connect, isAdmin: admin, adminNeedsGoogle, recheckAdmin, settings, setSettings, outbox, refreshOutbox, theme, setTheme, logMode,
       disconnectGoogle: () => { disconnect(); refreshGoogle(); toast("Google disconnected on this device") },
       viewInvoice: (id, justCreated = false) => setInvoiceView({ id, justCreated }),
       openClient: (id) => { setClientView(id); setTab("clients"); window.scrollTo({ top: 0 }) },
@@ -355,7 +360,7 @@ export default function App() {
       logOut: () => leave("You’ve logged out."),
       accountDeleted: () => leave("Your account was deleted."),
     }
-  }, [data, me, commit, replaceAll, ask, askFor, go, google, connect, admin, settings, outbox, refreshOutbox, leave, clientView, theme, setTheme, logMode, adminNeedsGoogle])
+  }, [data, me, commit, replaceAll, ask, askFor, go, google, connect, admin, settings, outbox, refreshOutbox, leave, clientView, theme, setTheme, logMode, adminNeedsGoogle, recheckAdmin])
 
   const confirm = <ConfirmDialog req={askReq} onDone={(ok, value) => { askResolve.current?.(ok, value); askResolve.current = null; setAskReq(null) }} />
   const toaster = <Toaster theme={resolvedTheme} position="bottom-center" mobileOffset={{ bottom: "calc(84px + env(safe-area-inset-bottom))" }} toastOptions={{ style: { fontFamily: "Inter, system-ui, sans-serif", borderRadius: 14 } }} />
