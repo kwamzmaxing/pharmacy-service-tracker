@@ -25,7 +25,7 @@ const A = ({ href, children }: { href: string; children: React.ReactNode }) => (
 )
 
 export function MtdPanel({ startYear }: { startYear: number }) {
-  const { data, commit, me } = useApp()
+  const { data, commit, me, openAccountant } = useApp()
   const p = data.profile
   const kind: PeriodKind = p.mtdPeriods || "standard"
   const [open, setOpen] = useState<number | null>(null)
@@ -158,7 +158,7 @@ export function MtdPanel({ startYear }: { startYear: number }) {
           <summary className="cursor-pointer font-medium text-brand-ink">GOV.UK guidance</summary>
           <ul className="mt-2 grid gap-1.5">{LINKS.map(([l, u]) => <li key={u}><A href={u}>{l}</A></li>)}</ul>
         </details>
-        <p className="text-[12px] text-muted-foreground">A guide, not financial or tax advice. Dates and categories checked against GOV.UK on {fmtDate(RATES_CHECKED)}. Check your records and figures with HMRC or an accountant.</p>
+        <p className="text-[12px] text-muted-foreground">A guide, not financial or tax advice. Dates and categories checked against GOV.UK on {fmtDate(RATES_CHECKED)}. Check your records and figures with HMRC or an accountant. <button type="button" onClick={openAccountant} className="font-medium text-brand-ink hover:underline">Talk to an accountant</button></p>
       </div>
     </Panel>
   )

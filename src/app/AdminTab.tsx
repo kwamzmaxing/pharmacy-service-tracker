@@ -8,9 +8,11 @@ import { cn } from "@/lib/utils"
 import { fmtDate, isoOf } from "@/lib/model"
 
 import { listFeedback, listOutbox, listPeople, markOutbox, saveSettings, type Feedback, type OutboxItem, type Person, type PublicSettings } from "@/lib/cloud"
-import { GOOGLE_HELP, GoogleError, sendMail, writeSheet } from "@/lib/google"
+import { GOOGLE_HELP, GoogleError, hasToken, sendMail, writeSheet } from "@/lib/google"
 import { useApp } from "./ctx"
 import { clearError, listErrors, type ErrorReport } from "@/lib/errors"
+import { listRequests, markEmailed, requestEmail, setRequestStatus, type AccountantRequest, type RequestStatus } from "@/lib/accountant"
+import { CONTACT_EMAIL } from "./brand"
 import { Empty, Field, Panel } from "./bits"
 
 const when = (iso?: string) => (iso ? fmtDate(isoOf(new Date(iso))) : "—")
@@ -94,10 +96,11 @@ export function AdminTab() {
   async function syncSheet() {
     setBusy("sheet")
     try {
-      const [p, f, o] = await Promise.all([listPeople(), listFeedback(), listOutbox()])
+      const [p, f, o, a] = await Promise.all([listPeople(), listFeedback(), listOutbox(), listRequests().catch(() => [] as AccountantRequest[])])
       const r = await writeSheet(settings?.sheetId, "KASA.Rx — account holders & feedback", [
         { title: "Account holders", rows: [["Name", "Email", "Created", "Last log-in"], ...p.map((x) => [x.name || "", x.email || "", x.created?.slice(0, 10) || "", x.lastLogin?.slice(0, 10) || ""])] },
         { title: "Feedback", rows: [["Date", "Name", "Email", "Topic", "Rating", "Message"], ...f.map((x) => [x.at.slice(0, 10), x.name, x.email, x.topic, x.rating || "", x.message])] },
+        { title: "Accountant requests", rows: [["Date", "Name", "Email", "Phone", "Contact by", "Best time", "Topics", "Details", "Status"], ...a.map((x) => [x.at.slice(0, 10), x.name, x.email, x.phone, x.contactBy, x.when, [...x.topics, ...(x.other ? ["Other: " + x.other] : [])].join("; "), x.details, x.status])] },
         { title: "Emails sent for others", rows: [["Date", "From", "Email", "What", "Status", "Note"], ...o.map((x) => [x.at.slice(0, 10), x.name, x.email, label(x), x.status, x.error || ""])] },
       ], me.email)
       await update({ sheetId: r.id, sheetUrl: r.url, sheetUpdatedAt: new Date().toISOString() }, true)
@@ -214,6 +217,8 @@ export function AdminTab() {
         <p className="mt-3 text-[12.5px] text-muted-foreground">Passwords are never stored or shown. A reset link lets the person choose a new password; their data is kept.</p>
       </Panel>
 
+      <AccountantPanel />
+
       <ErrorsPanel />
 
       <Panel title="Feedback" aside={`${feedback.length} total`}>
@@ -285,6 +290,77 @@ function ErrorsPanel() {
                 <Button size="sm" variant="ghost" onClick={() => clearError(e.id).then(() => setList((l) => l?.filter((x) => x.id !== e.id) ?? null)).catch(() => toast.error("Couldn’t clear it."))}>Clear</Button>
               </div>
               {e.stack && <details className="mt-1"><summary className="cursor-pointer text-[12px] text-brand-ink">Details</summary><pre className="mt-1 max-h-40 overflow-auto whitespace-pre-wrap break-words rounded bg-secondary p-2 text-[11px]">{e.stack}</pre></details>}
+            </li>
+          ))}
+        </ul>
+      )}
+    </Panel>
+  )
+}
+
+/** "Talk to an accountant" requests: emailed to the business inbox, with a status to track each one. */
+const REQ_STATUS: [RequestStatus, string][] = [["new", "New"], ["contacted", "Contacted"], ["matched", "Matched"], ["closed", "Closed"]]
+function AccountantPanel() {
+  const { me, google, connect } = useApp()
+  const [list, setList] = useState<AccountantRequest[] | null>(null)
+  const [busy, setBusy] = useState("")
+  const load = useCallback(() => listRequests().then(setList).catch(() => setList([])), [])
+  useEffect(() => { load() }, [load])
+
+  const emailOne = useCallback(async (r: AccountantRequest, quiet = false) => {
+    const m = requestEmail(r)
+    await sendMail({ to: CONTACT_EMAIL, subject: m.subject, body: m.body, replyTo: r.email }, me.email)
+    await markEmailed(r.uid)
+    if (!quiet) toast.success(`Emailed to ${CONTACT_EMAIL} ✓`)
+  }, [me.email])
+  // New requests go to the business inbox automatically when Gmail is already connected this visit
+  useEffect(() => {
+    if (!list || !hasToken("gmail")) return
+    const fresh = list.filter((r) => !r.emailedAt)
+    if (!fresh.length) return
+    ;(async () => {
+      let n = 0
+      for (const r of fresh) { try { await emailOne(r, true); n++ } catch { /* leave it for the button */ } }
+      if (n) { toast.success(`${n} new accountant request${n === 1 ? "" : "s"} emailed to ${CONTACT_EMAIL} ✓`); load() }
+    })()
+  }, [list, emailOne, load])
+
+  const fresh = list?.filter((r) => r.status === "new").length ?? 0
+  return (
+    <Panel title="Accountant requests" aside={list ? `${fresh} new · ${list.length} total` : undefined}>
+      <p className="mb-3 max-w-[64ch] text-[12.5px] text-muted-foreground">
+        People who asked to talk to an accountant. New requests are emailed to {CONTACT_EMAIL} when you open this page with Gmail connected, with replies going to the person. They agreed to their details being shared with an accountant.
+      </p>
+      {google.gmail !== "ready" && (
+        <p className="mb-3 flex flex-wrap items-center gap-2 rounded-xl bg-warn-tint px-3 py-2.5 text-[12.5px] text-warn">
+          Connect Gmail to email requests to {CONTACT_EMAIL}.
+          <button type="button" className="font-semibold underline-offset-2 hover:underline" onClick={() => connect("gmail")}>Connect Gmail</button>
+        </p>
+      )}
+      {!list ? <p className="text-[13px] text-muted-foreground">Loading…</p> : !list.length ? (
+        <Empty title="No requests yet">When someone uses “Talk to an accountant”, their request appears here.</Empty>
+      ) : (
+        <ul className="grid gap-3">
+          {list.map((r) => (
+            <li key={r.uid} className="rounded-xl bg-secondary/60 p-4 text-[13px]">
+              <div className="flex flex-wrap items-start justify-between gap-2">
+                <div className="min-w-0">
+                  <div className="font-semibold">{r.name}</div>
+                  <div className="break-all text-[12.5px] text-muted-foreground">{r.email}{r.phone ? ` · ${r.phone}` : ""} · prefers {r.contactBy === "either" ? "email or phone" : r.contactBy}{r.when ? ` · ${r.when}` : ""}</div>
+                  <div className="text-[12px] text-muted-foreground">Sent {when(r.at)}{r.emailedAt ? ` · emailed ${when(r.emailedAt)}` : " · not emailed yet"}</div>
+                </div>
+                <div className="flex flex-wrap gap-1.5">
+                  <select aria-label={`Status for ${r.name}`} value={r.status} onChange={async (e) => { const v = e.target.value as RequestStatus; try { await setRequestStatus(r.uid, v); load() } catch { toast.error("Couldn’t update it.") } }}
+                    className="h-8 rounded-full border border-border bg-background px-3 text-[12.5px]">
+                    {REQ_STATUS.map(([k, l]) => <option key={k} value={k}>{l}</option>)}
+                  </select>
+                  <Button size="sm" variant="outline" disabled={!!busy || google.gmail !== "ready"} onClick={async () => { setBusy(r.uid); try { await emailOne(r); load() } catch (e) { if (!(e instanceof GoogleError && e.kind === "cancelled")) toast.error("Gmail didn’t send it.") } finally { setBusy("") } }}>
+                    <Send /> {busy === r.uid ? "Sending…" : "Email it"}
+                  </Button>
+                </div>
+              </div>
+              <p className="mt-2"><span className="text-muted-foreground">About:</span> {[...r.topics, ...(r.other ? [`Other: ${r.other}`] : [])].join(", ")}</p>
+              {r.details && <p className="mt-1 whitespace-pre-line">{r.details}</p>}
             </li>
           ))}
         </ul>
