@@ -1,6 +1,6 @@
 import { useState } from "react"
 import { toast } from "sonner"
-import { FileDown } from "lucide-react"
+import { FileDown, UserRoundCheck } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
 import { Switch } from "@/components/ui/switch"
@@ -17,7 +17,7 @@ import { ExternalLink } from "lucide-react"
 const pence = (n: number) => `${Math.round(n * 100)}p`
 
 export function TaxTab() {
-  const { data, commit, me, go } = useApp()
+  const { data, commit, me, go, openAccountant } = useApp()
   const p = data.profile
   const years = taxYearsWithData(data)
   const [yearFrom, setYearFrom] = useState(years[0].from)
@@ -81,10 +81,13 @@ export function TaxTab() {
         <Button variant="outline" size="sm" onClick={download}><FileDown /> Download summary (PDF)</Button>
       </div>
 
-      <p className="rounded-xl bg-secondary/60 px-4 py-3 text-[12.5px] text-muted-foreground">
-        <b className="font-medium text-foreground">Estimates to help you plan, not financial or tax advice.</b> Figures checked against GOV.UK on {fmtDate(RATES_CHECKED)}. Check with HMRC or an accountant before you file.{" "}
-        <a href={`${import.meta.env.BASE_URL}privacy.html#disclaimer`} target="_blank" rel="noopener" className="underline underline-offset-2">Disclaimer</a>
-      </p>
+      <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl bg-secondary/60 px-4 py-3 text-[12.5px] text-muted-foreground">
+        <p className="min-w-0 max-w-[62ch]">
+          <b className="font-medium text-foreground">Estimates to help you plan, not financial or tax advice.</b> Figures checked against GOV.UK on {fmtDate(RATES_CHECKED)}. It’s always best to get advice for your own situation.{" "}
+          <a href={`${import.meta.env.BASE_URL}privacy.html#disclaimer`} target="_blank" rel="noopener" className="underline underline-offset-2">Disclaimer</a>
+        </p>
+        <Button size="sm" variant="outline" onClick={openAccountant}><UserRoundCheck /> Talk to an accountant</Button>
+      </div>
 
       <Ledger cells={[
         { label: current ? "Taxable profit so far" : "Taxable profit", value: money(t.profit), sub: `${money(t.income)} income` },

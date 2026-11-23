@@ -2,7 +2,7 @@ import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } fro
 import { toast } from "sonner"
 import { onAuthStateChanged, type User } from "firebase/auth"
 import { logOut } from "@/lib/authService"
-import { CalendarDays, Calculator, ChartPie, Ellipsis, FileText, House, LogOut, MessageSquare, NotebookPen, Receipt, Settings as SettingsIcon, ShieldCheck, Store, Monitor, Moon, Sun, UserRound } from "lucide-react"
+import { CalendarDays, Calculator, ChartPie, Ellipsis, FileText, House, LogOut, MessageSquare, NotebookPen, Receipt, Settings as SettingsIcon, ShieldCheck, Store, Monitor, Moon, Sun, UserRound, UserRoundCheck } from "lucide-react"
 import { Toaster } from "@/components/ui/sonner"
 import { Button } from "@/components/ui/button"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuRadioGroup, DropdownMenuRadioItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
@@ -24,6 +24,7 @@ import { BRAND, CONTACT_EMAIL, PRIVACY_URL, TAGLINE, Wordmark } from "@/app/bran
 import { LogTab } from "@/app/LogTab"
 import { HomeTab } from "@/app/HomeTab"
 import { Welcome } from "@/app/Welcome"
+import { AccountantDialog } from "@/app/AccountantDialog"
 import { InvoicesTab } from "@/app/InvoicesTab"
 
 // Less-used sections load when first opened, keeping the first download small
@@ -140,6 +141,7 @@ export default function App() {
   const [emailReq, setEmailReq] = useState<{ id: string; kind: EmailKind; fromFollowUps: boolean } | null>(null)
   const [followOpen, setFollowOpen] = useState(false)
   const [feedbackOpen, setFeedbackOpen] = useState(false)
+  const [accountantOpen, setAccountantOpen] = useState(false)
   const [theme, setThemeState] = useState<ThemePref>(themePref)
   const [resolvedTheme, setResolvedTheme] = useState<"dark" | "light">(() => resolveTheme(themePref()))
   const setTheme = useCallback((p: ThemePref) => { setThemeState(p); setResolvedTheme(applyTheme(p)) }, [])
@@ -357,6 +359,7 @@ export default function App() {
       email: (id, kind) => { setInvoiceView(null); setEmailReq({ id, kind, fromFollowUps: false }) },
       showFollowUps: () => setFollowOpen(true),
       openFeedback: () => setFeedbackOpen(true),
+      openAccountant: () => setAccountantOpen(true),
       logOut: () => leave("You’ve logged out."),
       accountDeleted: () => leave("Your account was deleted."),
     }
@@ -402,6 +405,7 @@ export default function App() {
                   <DropdownMenuItem onSelect={() => go("home")}><House /> Home</DropdownMenuItem>
                   <DropdownMenuItem onSelect={() => go("account")}><UserRound /> Settings</DropdownMenuItem>
                   {admin && <DropdownMenuItem onSelect={() => go("admin")}><ShieldCheck /> Admin</DropdownMenuItem>}
+                  <DropdownMenuItem onSelect={() => setAccountantOpen(true)}><UserRoundCheck /> Talk to an accountant</DropdownMenuItem>
                   <DropdownMenuItem onSelect={() => setFeedbackOpen(true)}><MessageSquare /> Send feedback</DropdownMenuItem>
                   <DropdownMenuSeparator />
                   <DropdownMenuLabel className="pb-1 text-xs font-normal text-muted-foreground">Appearance</DropdownMenuLabel>
@@ -461,6 +465,7 @@ export default function App() {
       <EmailDialog req={emailReq} onClose={() => setEmailReq(null)} onBack={emailReq?.fromFollowUps ? () => { setEmailReq(null); setFollowOpen(true) } : undefined} />
       <FollowUpDialog open={followOpen} onClose={() => setFollowOpen(false)} onFollowUp={(id) => { setFollowOpen(false); setEmailReq({ id, kind: "followup", fromFollowUps: true }) }} onView={() => { setFollowOpen(false); go("invoices") }} />
       <FeedbackDialog open={feedbackOpen} onClose={() => setFeedbackOpen(false)} />
+      <AccountantDialog open={accountantOpen} onClose={() => setAccountantOpen(false)} />
       {confirm}
       {toaster}
     </AppCtx.Provider>

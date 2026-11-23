@@ -104,6 +104,23 @@ service cloud.firestore {
       allow read, delete: if isAdmin() || (signedIn() && resource.data.uid == request.auth.uid);
     }
 
+    // "Talk to an accountant" requests: one per person (the document is their user ID). Only they and the
+    // admin can read it; they can send, update or withdraw it; the admin updates the status.
+    match /accountantRequests/{uid} {
+      function validRequest() {
+        let r = request.resource.data;
+        return r.keys().hasOnly(['uid', 'name', 'email', 'phone', 'contactBy', 'topics', 'other', 'details', 'when', 'consent', 'status', 'at', 'emailedAt'])
+          && r.uid == uid && r.email == request.auth.token.email && r.consent == true
+          && str(r.name, 120) && str(r.phone, 40) && r.contactBy in ['email', 'phone', 'either']
+          && r.topics is list && r.topics.size() <= 12 && str(r.other, 200) && str(r.details, 2000) && str(r.when, 120)
+          && str(r.at, 40);
+      }
+      allow read: if me(uid) || isAdmin();
+      allow create, update: if me(uid) && validRequest() && request.resource.data.status == 'new' && !('emailedAt' in request.resource.data);
+      allow update: if isAdmin() && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'emailedAt']);
+      allow delete: if me(uid) || isAdmin();
+    }
+
     match /admins/{uid} {
       allow read: if me(uid);
       allow write: if false;

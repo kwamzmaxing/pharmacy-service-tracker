@@ -47,6 +47,8 @@ export type AppApi = {
   email: (id: string, kind: EmailKind) => void
   showFollowUps: () => void
   openFeedback: () => void
+  /** "Talk to an accountant" form. */
+  openAccountant: () => void
   logOut: () => void
   accountDeleted: () => void
   /** Connection state of this person's Google services on this device. */

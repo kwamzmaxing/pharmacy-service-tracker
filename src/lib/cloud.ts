@@ -95,6 +95,7 @@ export async function wipeOwnRecords(uid: string) {
     } catch { /* not allowed or offline: carry on */ }
   }
   await deleteDoc(doc(db, "outboxQuota", uid)).catch(() => {})
+  await deleteDoc(doc(db, "accountantRequests", uid)).catch(() => {})
 }
 export async function listPeople(): Promise<Person[]> {
   const snap = await getDocs(collection(db, "users"))
