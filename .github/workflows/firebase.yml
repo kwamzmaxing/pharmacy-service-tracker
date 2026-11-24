@@ -1,0 +1,51 @@
+name: Publish to kasarx.co.uk
+
+# Builds the site for the root of kasarx.co.uk and publishes it, together with the database security
+# rules in firestore.rules, to Firebase. Needs the FIREBASE_SERVICE_ACCOUNT repository secret
+# (see SETUP.md); until that's added, this workflow skips publishing and says so.
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: firebase
+  cancel-in-progress: true
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    env:
+      HAS_KEY: ${{ secrets.FIREBASE_SERVICE_ACCOUNT != '' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      # The tax, National Insurance, mileage, Making Tax Digital and invoice tests must pass before anything goes live
+      - run: pnpm test
+      - run: pnpm build
+        env:
+          BASE_PATH: /
+          VITE_BUILD: ${{ github.sha }}
+      - name: Skip publishing (no Firebase key yet)
+        if: env.HAS_KEY != 'true'
+        run: echo "::notice::FIREBASE_SERVICE_ACCOUNT isn't set, so nothing was published to Firebase. See SETUP.md, 'Publishing to kasarx.co.uk'."
+      - name: Publish site and security rules
+        if: env.HAS_KEY == 'true'
+        env:
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+        run: |
+          key="$RUNNER_TEMP/firebase-key.json"
+          printf '%s' "$FIREBASE_SERVICE_ACCOUNT" > "$key"
+          export GOOGLE_APPLICATION_CREDENTIALS="$key"
+          npx --yes firebase-tools@15 deploy --only hosting,firestore:rules --project service-tracker-invoice --non-interactive
+          rm -f "$key"

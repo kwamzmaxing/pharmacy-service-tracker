@@ -16,7 +16,7 @@ export const firebaseConfig = {
 export const googleClientId = "1006803367671-b7ipqvaf77a1pom9peodq1ubksunk9v6.apps.googleusercontent.com"
 
 /** Where the site is published; used in emails. */
-export const siteUrl = "https://kwamzmaxing.github.io/pharmacy-service-tracker/"
+export const siteUrl = "https://kasarx.co.uk/"
 
 const useEmulator = import.meta.env.VITE_USE_EMULATOR === "1"
 export const isConfigured = useEmulator || !!(firebaseConfig.apiKey && firebaseConfig.projectId)

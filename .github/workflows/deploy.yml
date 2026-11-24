@@ -1,4 +1,4 @@
-name: Publish site
+name: Publish site (GitHub address)
 
 on:
   push:
@@ -34,6 +34,17 @@ jobs:
           BASE_PATH: /${{ github.event.repository.name }}/
           VITE_BUILD: ${{ github.sha }}
       - run: cp dist/index.html dist/404.html
+      # Once the site is live on kasarx.co.uk, set the repository variable MOVED_TO_DOMAIN to "true":
+      # this address then only redirects there, and the old installed app clears itself.
+      - name: Replace with a redirect to kasarx.co.uk
+        if: vars.MOVED_TO_DOMAIN == 'true'
+        run: |
+          rm -rf dist && mkdir dist
+          cp moved/index.html dist/index.html
+          cp moved/index.html dist/404.html
+          cp moved/index.html dist/privacy.html
+          cp moved/index.html dist/changelog.html
+          cp moved/sw.js dist/sw.js
       - uses: actions/upload-pages-artifact@v3
         with:
           path: dist
