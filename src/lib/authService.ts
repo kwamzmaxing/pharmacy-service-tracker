@@ -3,10 +3,18 @@
 import {
   browserLocalPersistence, browserSessionPersistence, createUserWithEmailAndPassword, deleteUser, EmailAuthProvider,
   GoogleAuthProvider, linkWithPopup, OAuthProvider, reauthenticateWithCredential, reauthenticateWithPopup, sendEmailVerification,
-  sendPasswordResetEmail, setPersistence, signInWithEmailAndPassword, signInWithPopup, signOut, updatePassword, updateProfile,
+  sendPasswordResetEmail, setPersistence, signInWithCredential, signInWithEmailAndPassword, signInWithPopup, signOut, updatePassword, updateProfile,
   type User,
 } from "firebase/auth"
 import { auth } from "./firebase"
+import { emulator } from "@/config"
+
+// Local testing only: the Firebase emulator can't open Google's window here, so tests sign in with a fake
+// Google credential. This code only exists in emulator builds (VITE_USE_EMULATOR=1), never on the real site.
+if (emulator && typeof window !== "undefined") {
+  ;(window as unknown as { __kasaTestGoogle?: (json: string) => Promise<unknown> }).__kasaTestGoogle = (json: string) =>
+    signInWithCredential(auth, GoogleAuthProvider.credential(json))
+}
 
 export type Provider = "google" | "microsoft"
 const providerFor = (p: Provider) => {

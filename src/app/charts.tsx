@@ -112,12 +112,14 @@ export function MonthlyBars({ points }: { points: MonthPoint[] }) {
 /* ---------- budget pie ---------- */
 export type Slice = { id: string; label: string; value: number; color: string }
 /** Pots as a ring: a 2px gap between slices, hover or focus a slice (or its row) to read it in the middle. */
-export function Donut({ slices, total, centreLabel, active, onActive }: {
+export function Donut({ slices, total, centreLabel, active, onActive, format = money }: {
   slices: Slice[]
   total: number
   centreLabel: string
   active: string | null
   onActive: (id: string | null) => void
+  /** How values are written (money by default; counts for the admin page). */
+  format?: (v: number) => string
 }) {
   const size = 220, r = 100, inner = 70, c = size / 2
   const sumV = slices.reduce((a, s) => a + Math.max(0, s.value), 0)
@@ -141,7 +143,7 @@ export function Donut({ slices, total, centreLabel, active, onActive }: {
   return (
     <div className="relative mx-auto aspect-square w-full max-w-[260px]">
       <svg viewBox={`0 0 ${size} ${size}`} className="size-full" role="img"
-        aria-label={`Split of ${money(total)}: ${slices.map((s) => `${s.label} ${pct(s.value)}%`).join(", ")}`}
+        aria-label={`Split of ${format(total)}: ${slices.map((s) => `${s.label} ${pct(s.value)}%`).join(", ")}`}
         onMouseLeave={() => onActive(null)}>
         {!arcs.length && <circle cx={c} cy={c} r={(r + inner) / 2} fill="none" stroke="hsl(var(--secondary))" strokeWidth={r - inner} />}
         {arcs.map(({ s, d }) => (
@@ -152,7 +154,7 @@ export function Donut({ slices, total, centreLabel, active, onActive }: {
       </svg>
       <div className="pointer-events-none absolute inset-[22%] flex flex-col items-center justify-center text-center" aria-live="polite">
         <span className="line-clamp-2 text-[12px] leading-tight text-muted-foreground">{hot ? hot.label : centreLabel}</span>
-        <span className="num mt-1 font-display text-[clamp(17px,5vw,22px)] font-medium leading-tight">{money(hot ? hot.value : total)}</span>
+        <span className="num mt-1 font-display text-[clamp(17px,5vw,22px)] font-medium leading-tight">{format(hot ? hot.value : total)}</span>
         {hot && <span className="mt-0.5 text-[12px] text-muted-foreground">{pct(hot.value)}%</span>}
       </div>
     </div>

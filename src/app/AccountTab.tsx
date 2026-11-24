@@ -237,6 +237,11 @@ export function AccountTab() {
           </div>
           <Button variant="outline" onClick={logOut}><LogOut /> Log out</Button>
         </div>
+        <div className="mt-4 max-w-sm">
+          <Field key={"callme" + (p.preferredName ?? "")} id="p-preferredName" label="What should we call you?" hint="(used in greetings)" maxLength={40}
+            placeholder={(p.fullName || me.name || "").trim().split(/\s+/)[0] || "e.g. Sam"} defaultValue={p.preferredName || ""}
+            onBlur={(e) => { const v = e.target.value.trim().slice(0, 40); if (v !== (p.preferredName || "")) set("preferredName", v) }} />
+        </div>
         <p className="mt-2 max-w-[62ch] text-[12.5px] text-muted-foreground">Log out to switch to a different account. Your tracker is saved online: log in on any phone or computer to see it.</p>
         {!me.viaGoogle && !me.emailVerified && (
           <p className="mt-2 text-[12.5px] text-muted-foreground">Please confirm your email so password resets reach you. <button type="button" className="font-semibold text-brand-ink hover:underline" onClick={resendVerify}>Resend the confirmation email</button></p>

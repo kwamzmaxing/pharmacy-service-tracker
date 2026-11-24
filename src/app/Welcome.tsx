@@ -14,6 +14,7 @@ export function Welcome({ onDone }: { onDone: () => void }) {
   const [step, setStep] = useState(0)
   const [f, setF] = useState({
     fullName: data.profile.fullName || me.name || "",
+    preferredName: data.profile.preferredName || "",
     tradingName: data.profile.tradingName || "",
     accountName: data.profile.accountName || data.profile.fullName || me.name || "",
     sortCode: data.profile.sortCode || "",
@@ -36,6 +37,7 @@ export function Welcome({ onDone }: { onDone: () => void }) {
     commit((d) => {
       const p = d.profile
       p.fullName = f.fullName.trim()
+      p.preferredName = f.preferredName.trim().slice(0, 40)
       p.tradingName = f.tradingName.trim()
       if (!p.accountName || f.accountName.trim()) p.accountName = f.accountName.trim() || p.fullName
       if (sc) p.sortCode = sc
@@ -52,6 +54,7 @@ export function Welcome({ onDone }: { onDone: () => void }) {
     commit((d) => {
       d.meta.welcomed = 1
       if (!d.profile.fullName && f.fullName.trim()) d.profile.fullName = f.fullName.trim()
+      if (f.preferredName.trim()) d.profile.preferredName = f.preferredName.trim().slice(0, 40)
     })
     onDone()
   }
@@ -80,6 +83,7 @@ export function Welcome({ onDone }: { onDone: () => void }) {
               <p className="mt-1 text-[13px] text-muted-foreground">This goes at the top of every invoice.</p>
             </div>
             <Field id="w-name" label="Your full name" autoComplete="name" value={f.fullName} onChange={set("fullName")} autoFocus />
+            <Field id="w-callme" label="What should we call you?" hint="(optional)" autoComplete="nickname" maxLength={40} placeholder={f.fullName.trim().split(/\s+/)[0] || "e.g. Sam"} value={f.preferredName} onChange={set("preferredName")} />
             <Field id="w-trading" label="Business or trading name" hint="(optional)" value={f.tradingName} onChange={set("tradingName")} placeholder="e.g. Patel Locum Services Ltd" />
           </>
         )}

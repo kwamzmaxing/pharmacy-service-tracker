@@ -31,6 +31,8 @@ export type Entry = {
 export type Terms = "14th" | "0" | "7" | "14" | "30"
 export type Profile = {
   fullName: string
+  /** What they'd like to be called in greetings ("Good morning, Sam"); their first name if empty. */
+  preferredName?: string
   tradingName: string
   gphc: string
   phone: string
@@ -259,6 +261,10 @@ export function tidyAccountNumber(v: string) {
   const d = v.replace(/\s/g, "")
   return /^\d{6,8}$/.test(d) ? d : null
 }
+
+/** The name to greet someone by: what they asked to be called, else their first name. */
+export const callName = (p: Pick<Profile, "preferredName" | "fullName">, fallback = "") =>
+  (p.preferredName || "").trim() || (p.fullName || fallback || "").trim().split(/\s+/)[0] || ""
 
 /** Round to whole pence. */
 export const pence = (n: number) => Math.round((Number(n) || 0) * 100) / 100

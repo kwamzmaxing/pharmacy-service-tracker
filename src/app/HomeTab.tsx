@@ -1,11 +1,14 @@
 // Home: where things stand, what needs doing, and a way into every part of the tracker.
 import type { ReactNode } from "react"
-import { ArrowRight, CalendarDays, Calculator, Car, ChartPie, Clock, FileText, Pill as PillIcon, Plus, Receipt, Settings, Store } from "lucide-react"
+import { useState } from "react"
+import { ArrowRight, CalendarDays, Calculator, Car, ChartPie, CheckCircle2, Clock, FileText, Mail, Pill as PillIcon, Plus, Receipt, Settings, Store } from "lucide-react"
 import { cn } from "@/lib/utils"
-import { entryAmt, fmtDate, followUpsDue, invStatus, money, monthly, plural, qtyText, taxSummary, today, unitOf } from "@/lib/model"
+import { callName, entryAmt, fmtDate, followUpsDue, invStatus, isoOf, money, monthly, plural, qtyText, taxSummary, today, unitOf } from "@/lib/model"
 import { useApp, type Tab } from "./ctx"
 import { placeName, shiftPay, toLog, upcoming } from "@/lib/shifts"
-import { Ledger, Panel } from "./bits"
+import { Panel } from "./bits"
+import { Donut, type Slice } from "./charts"
+import { ActivityList, Change, LineChart, StatCard, pctChange, type Activity } from "./dashCharts"
 
 function greeting() {
   const h = new Date().getHours()
@@ -29,9 +32,19 @@ function Action({ icon, label, sub, onClick }: { icon: ReactNode; label: string;
 export function HomeTab() {
   const { data, me, go, google, showFollowUps } = useApp()
   const p = data.profile
-  const first = (p.fullName || me.name || "").trim().split(/\s+/)[0]
-  const months = monthly(data, 1)
-  const thisMonth = months[0]
+  const first = callName(p, me.name)
+  const months = monthly(data, 12)
+  const thisMonth = months[months.length - 1]
+  const t = today()
+  // This month so far vs the same point last month, so a part-month isn't compared with a whole one
+  const lastSameDay = (() => { const d = new Date(); const m = new Date(d.getFullYear(), d.getMonth() - 1, 1); const end = new Date(m.getFullYear(), m.getMonth() + 1, 0); return isoOf(new Date(m.getFullYear(), m.getMonth(), Math.min(d.getDate(), end.getDate()))) })()
+  const monthStart = t.slice(0, 8) + "01", lastStart = lastSameDay.slice(0, 8) + "01"
+  const loggedIn = (a: string, b: string) => data.entries.filter((e) => e.date >= a && e.date <= b).reduce((x, e) => x + entryAmt(e), 0)
+  const paidIn = (a: string, b: string) => data.invoices.filter((i) => i.status === "paid" && i.paidDate && i.paidDate >= a && i.paidDate <= b).reduce((x, i) => x + i.total, 0)
+  const loggedNow = loggedIn(monthStart, t), loggedBefore = loggedIn(lastStart, lastSameDay)
+  const paidNow = paidIn(monthStart, t), paidBefore = paidIn(lastStart, lastSameDay)
+  const six = months.slice(-6)
+  const cashSix = six.map((m) => paidIn(m.ym + "-01", m.ym + "-31"))
   const unbilled = data.entries.filter((e) => !e.invoiced)
   const unbilledTotal = unbilled.reduce((a, e) => a + entryAmt(e), 0)
   const open = data.invoices.filter((i) => invStatus(i) !== "paid")
@@ -55,7 +68,32 @@ export function HomeTab() {
   if (missing.length) todo.push({ tone: "info", text: `Your invoices are missing ${missing.join(" and ")}.`, cta: "Add details", act: () => go("account") })
   if (!data.clients.length) todo.push({ tone: "info", text: "Save the pharmacies you work for so their details fill in on invoices.", cta: "Add a pharmacy", act: () => go("clients") })
 
-  const recent = [...data.entries].sort((a, b) => b.date.localeCompare(a.date)).slice(0, 5)
+  // Where this tax year's work came from, by pharmacy (top four, then everything else)
+  const [hotSlice, setHotSlice] = useState<string | null>(null)
+  const byClient: Record<string, number> = {}
+  for (const e of data.entries) if (e.date >= tax.year.from && e.date <= tax.year.to) byClient[e.clientId || ""] = (byClient[e.clientId || ""] || 0) + entryAmt(e)
+  const ranked = Object.entries(byClient).filter(([, v]) => v > 0).sort((a, b) => b[1] - a[1])
+  const slices: Slice[] = ranked.slice(0, 4).map(([id, v], i) => ({ id: id || "none", label: id ? data.clients.find((c) => c.id === id)?.name || "Pharmacy" : "Not linked to a pharmacy", value: v, color: `var(--pot-${i})` }))
+  const rest = ranked.slice(4).reduce((a, [, v]) => a + v, 0)
+  if (rest > 0) slices.push({ id: "other", label: "Other pharmacies", value: rest, color: "hsl(var(--muted-foreground))" })
+  const workTotal = slices.reduce((a, x) => a + x.value, 0)
+
+  // Recent activity across the tracker, newest first
+  const activity: Activity[] = []
+  for (const e of data.entries) {
+    const sv = svc(e.serviceId), c = e.clientId ? data.clients.find((x) => x.id === e.clientId) : undefined
+    activity.push({ id: "e" + e.id, at: e.date, icon: <PillIcon />, text: <>Logged {sv?.name || "work"}{unitOf(sv) !== "each" || e.qty !== 1 ? ` · ${qtyText(e.qty, unitOf(sv))}` : ""} <span className="num font-medium">{money(entryAmt(e))}</span></>, sub: c?.name })
+  }
+  for (const i of data.invoices) {
+    activity.push({ id: "i" + i.id, at: i.created || i.issued, icon: <FileText />, text: <>Created {i.number} for {i.to.name || "a pharmacy"} <span className="num font-medium">{money(i.total)}</span></> })
+    if (i.sentAt) activity.push({ id: "s" + i.id, at: i.sentAt, icon: <Mail />, text: <>Emailed {i.number} to {i.to.name || "the pharmacy"}</> })
+    if (i.status === "paid" && i.paidDate) activity.push({ id: "p" + i.id, at: i.paidDate, icon: <CheckCircle2 />, text: <>{i.number} paid <span className="num font-medium">{money(i.total)}</span></>, sub: i.to.name })
+  }
+  for (const x of data.expenses) activity.push({ id: "x" + x.id, at: x.date, icon: <Receipt />, text: <>Expense: {x.desc || "cost"} <span className="num font-medium">{money(x.amount)}</span></> })
+  for (const sh of data.shifts) if (sh.created) activity.push({ id: "sh" + sh.id, at: sh.created, icon: <CalendarDays />, text: <>Booked a shift at {placeName(data, sh)}</>, sub: `${fmtDate(sh.date)}, ${sh.start}` })
+  // Dates (yyyy-mm-dd) count as midday local time; nothing dated in the future
+  const when = (a: string) => new Date(a.length === 10 ? a + "T12:00:00" : a).getTime()
+  const recentActivity = activity.filter((a) => a.at && (a.at.length === 10 ? a.at <= t : true)).sort((a, b) => when(b.at) - when(a.at)).slice(0, 8)
 
   const nextShift = upcoming(data)[0]
   const sections: { tab: Tab; icon: ReactNode; title: string; text: string; stat: string }[] = [
@@ -74,6 +112,7 @@ export function HomeTab() {
       <div className="pt-2">
         <p className="text-[13px] text-muted-foreground">{new Date().toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long" })}</p>
         <h2 className="mt-1 font-display text-[clamp(24px,5vw,32px)] font-medium leading-tight">{greeting()}{first ? `, ${first}` : ""}.</h2>
+        <p className="mt-1 text-[14px] text-muted-foreground">Here’s how your locum work is going.</p>
       </div>
 
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
@@ -83,15 +122,43 @@ export function HomeTab() {
         <Action icon={<FileText />} label="Create invoice" sub="From the work you’ve logged" onClick={() => go("summary")} />
       </div>
 
-      <Ledger
-        cells={[
-          { label: "Logged this month", value: money(thisMonth.logged), sub: new Date().toLocaleDateString("en-GB", { month: "long", year: "numeric" }) },
-          { label: "Not invoiced yet", value: money(unbilledTotal), sub: unbilled.length ? plural(unbilled.length, "entry", "entries") : "All invoiced" },
-          { label: "Owed to you", value: money(owed), sub: overdue.length ? `${overdue.length} overdue` : open.length ? "None overdue" : "Nothing outstanding", alert: overdue.length > 0 },
-          { label: "Set aside for tax", value: money(tax.total), sub: `Estimate for ${tax.year.label}` },
-        ]}
-      />
+      <div className="grid grid-cols-2 gap-2 lg:grid-cols-4">
+        <StatCard label="Earned this month" value={money(loggedNow)} foot={<Change value={pctChange(loggedNow, loggedBefore)} label="vs this point last month" />} spark={six.map((m) => m.logged)} onClick={() => go("log")} />
+        <StatCard label="Paid to you this month" value={money(paidNow)} foot={<Change value={pctChange(paidNow, paidBefore)} label="vs this point last month" />} spark={cashSix} sparkColor="var(--series-paid)" onClick={() => go("invoices")} />
+        <StatCard label="Owed to you" value={money(owed)} alert={overdue.length > 0} onClick={() => go("invoices")}
+          foot={<span className="text-[12px] text-muted-foreground">{open.length ? `${plural(open.length, "unpaid invoice")}${overdue.length ? ` · ${overdue.length} overdue` : ""}` : "Nothing outstanding"}</span>} />
+        <StatCard label="Set aside for tax" value={money(tax.total)} onClick={() => go("tax")}
+          foot={<span className="text-[12px] text-muted-foreground">Estimate for {tax.year.label} · {money(unbilledTotal)} not invoiced</span>} />
+      </div>
 
+      <div className="grid gap-5 sm:gap-6 lg:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)]">
+        <Panel title="Earnings overview" aside="Last 12 months, by the month you did the work">
+          <LineChart
+            points={months.map((m) => ({ label: m.label, long: new Date(m.ym + "-01T00:00:00").toLocaleDateString("en-GB", { month: "long", year: "numeric" }), values: { logged: m.logged, paid: m.paid } }))}
+            series={[{ key: "logged", label: "Work logged", color: "var(--series-logged)" }, { key: "paid", label: "Paid for so far", color: "var(--series-paid)" }]}
+            format={money} axis={(v) => (v >= 1000 ? `£${(v / 1000).toFixed(v % 1000 === 0 ? 0 : 1)}k` : `£${Math.round(v)}`)}
+            ariaLabel="Work logged and paid for, by month worked, over the last 12 months" empty="Log some work to see your earnings here." />
+        </Panel>
+        <Panel title="Where your work comes from" aside={`${tax.year.label} tax year`}>
+          {slices.length ? (
+            <div className="grid grid-cols-[minmax(0,1fr)] gap-4">
+              <Donut slices={slices} total={workTotal} centreLabel="Work logged" active={hotSlice} onActive={setHotSlice} />
+              <ul className="grid grid-cols-[minmax(0,1fr)] gap-1.5 text-[13px]">
+                {slices.map((x) => (
+                  <li key={x.id} className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-baseline gap-x-2" onMouseEnter={() => setHotSlice(x.id)} onMouseLeave={() => setHotSlice(null)}>
+                    <span className="size-2.5 self-center rounded-[3px]" style={{ background: x.color }} />
+                    <span className="truncate">{x.label}</span>
+                    <span className="num text-muted-foreground">{Math.round((x.value / workTotal) * 100)}%</span>
+                    <span className="num col-start-2 font-medium text-foreground">{money(x.value)}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : <p className="text-[13.5px] text-muted-foreground">Log work against a pharmacy to see the split here.</p>}
+        </Panel>
+      </div>
+
+      <div className="grid items-start gap-5 sm:gap-6 lg:grid-cols-2">
       <Panel title="Needs your attention">
         {todo.length ? (
           <ul className="grid divide-y divide-border/60">
@@ -109,6 +176,11 @@ export function HomeTab() {
           <p className="text-[14px] text-muted-foreground">You’re all caught up: everything is invoiced and nothing is overdue.</p>
         )}
       </Panel>
+
+      <Panel title="Recent activity" aside={<button type="button" className="font-medium text-brand-ink hover:underline" onClick={() => go("log")}>See your log</button>}>
+        <ActivityList items={recentActivity} empty="Nothing yet. Log your first service, shift or expense to see it here." />
+      </Panel>
+      </div>
 
       <section aria-labelledby="h-sections">
         <h2 id="h-sections" className="mb-3 font-display text-[17px] font-medium">Your tracker</h2>
@@ -130,27 +202,6 @@ export function HomeTab() {
         </div>
       </section>
 
-      <Panel title="Recently logged" aside={recent.length ? <button type="button" className="font-medium text-brand-ink hover:underline" onClick={() => go("log")}>See all</button> : undefined}>
-        {recent.length ? (
-          <ul className="grid divide-y divide-border/60">
-            {recent.map((e) => {
-              const s = svc(e.serviceId)
-              const c = e.clientId ? data.clients.find((x) => x.id === e.clientId) : undefined
-              return (
-                <li key={e.id} className="flex items-center justify-between gap-4 py-3 first:pt-0 last:pb-0">
-                  <span className="min-w-0">
-                    <span className="block truncate text-[14px] font-medium">{s?.name || "Service"}{unitOf(s) !== "each" || e.qty !== 1 ? ` · ${qtyText(e.qty, unitOf(s))}` : ""}</span>
-                    <span className="block truncate text-[12.5px] text-muted-foreground">{fmtDate(e.date)}{c ? ` · ${c.name}` : ""}{e.invoiced ? " · invoiced" : ""}</span>
-                  </span>
-                  <span className="num whitespace-nowrap text-[14px] font-medium">{money(entryAmt(e))}</span>
-                </li>
-              )
-            })}
-          </ul>
-        ) : (
-          <p className="text-[14px] text-muted-foreground">Nothing logged yet. <button type="button" className="font-medium text-brand-ink hover:underline" onClick={() => go("log")}>Add your first entry</button></p>
-        )}
-      </Panel>
     </div>
   )
 }

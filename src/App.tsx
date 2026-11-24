@@ -187,7 +187,9 @@ export default function App() {
     setPhase("loading")
     const m = meFrom(u)
     const newName = sessionStorage.getItem("pst_new_name") || ""
+    const callMe = sessionStorage.getItem("pst_call_me") || ""
     sessionStorage.removeItem("pst_new_name")
+    sessionStorage.removeItem("pst_call_me")
     if (newName && !m.name) m.name = newName
     const vault = openVault(u.uid, onProblem)
     vaultRef.current = vault
@@ -202,6 +204,7 @@ export default function App() {
     if (!d) {
       d = newData(m.name)
       d.profile.email = m.email
+      if (callMe) d.profile.preferredName = callMe.slice(0, 40)
     }
     // Saves a new tracker, and keeps any one-off upgrades from loading (only changed parts are written).
     // Not awaited: with weak or no signal the save waits for the server, and the tracker should open anyway.

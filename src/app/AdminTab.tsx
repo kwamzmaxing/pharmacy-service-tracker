@@ -4,12 +4,12 @@ import { sendPasswordReset } from "@/lib/authService"
 import { Copy, ExternalLink, RefreshCw, Send, Sheet, Star } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Switch } from "@/components/ui/switch"
-import { cn } from "@/lib/utils"
 import { fmtDate, isoOf } from "@/lib/model"
 
 import { listFeedback, listOutbox, listPeople, markOutbox, saveSettings, type Feedback, type OutboxItem, type Person, type PublicSettings } from "@/lib/cloud"
 import { GOOGLE_HELP, GoogleError, hasToken, sendMail, writeSheet } from "@/lib/google"
 import { useApp } from "./ctx"
+import { AdminDashboard } from "./AdminDashboard"
 import { clearError, listErrors, type ErrorReport } from "@/lib/errors"
 import { listRequests, markEmailed, requestEmail, setRequestStatus, type AccountantRequest, type RequestStatus } from "@/lib/accountant"
 import { CONTACT_EMAIL } from "./brand"
@@ -124,14 +124,7 @@ export function AdminTab() {
       <p className="rounded-xl bg-secondary/60 px-4 py-3 text-[12.5px] text-muted-foreground">
         Admin only works when you log in with Google, so your Google 2-Step Verification protects it. Logging in with a password gives an ordinary account.
       </p>
-      <div className="grid grid-cols-3 gap-2.5">
-        {([["Account holders", people.length], ["Waiting to send", waiting.length], ["Feedback", feedback.length]] as const).map(([k, v]) => (
-          <div key={k} className={cn("min-w-0 rounded-2xl border bg-card px-3.5 py-3", k === "Waiting to send" && v > 0 && "border-destructive/40 bg-danger-tint")}>
-            <div className="truncate text-[11.5px] font-semibold text-muted-foreground">{k}</div>
-            <div className="num font-display text-[21px] font-medium">{v}</div>
-          </div>
-        ))}
-      </div>
+      <AdminDashboard people={people} feedback={feedback} outbox={outbox} />
 
       {!s && (
         <Panel title="Finish setting up">
