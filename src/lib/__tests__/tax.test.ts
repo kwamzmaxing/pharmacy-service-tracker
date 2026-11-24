@@ -72,3 +72,20 @@ describe("Trading allowance", () => {
     expect(big.method).toBe("expenses")
   })
 })
+
+import { studentLoanOnProfit, studentLoanRepay } from "../model"
+describe("Student loans (2026/27 GOV.UK thresholds)", () => {
+  it("9% over the plan threshold, as in GOV.UK's Plan 1 example", () => {
+    expect(studentLoanRepay(33000, ["plan1"])).toBeCloseTo(549) // £33,000 − £26,900 = £6,100 × 9%
+    expect(studentLoanRepay(29000, ["plan2"])).toBe(0)
+  })
+  it("more than one plan: 9% over the lowest undergraduate threshold, plus 6% over £21,000 for a Postgraduate Loan", () => {
+    expect(studentLoanRepay(38400, ["plan1", "plan2"])).toBeCloseTo((38400 - 26900) * 0.09)
+    expect(studentLoanRepay(30000, ["plan2", "pg"])).toBeCloseTo((30000 - 29385) * 0.09 + 9000 * 0.06)
+  })
+  it("locum profit adds repayments on top of what payroll takes from a salary", () => {
+    expect(studentLoanOnProfit(30000, 10000, ["plan2", "pg"])).toBeCloseTo(1500) // £10,000 × (9% + 6%)
+    expect(studentLoanOnProfit(0, 20000, ["plan2"])).toBe(0)
+    expect(studentLoanOnProfit(0, 40000, [])).toBe(0)
+  })
+})

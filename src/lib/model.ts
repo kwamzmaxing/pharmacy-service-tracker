@@ -66,6 +66,8 @@ export type Profile = {
   scotland?: boolean
   /** Yearly income from employment (PAYE), to place self-employed profit in the right tax bands. */
   otherIncome?: number
+  /** Student loan plans they repay (none if empty). */
+  studentLoans?: StudentPlan[]
   /** Count income when it's paid (cash basis, HMRC's default) or when the work was done. */
   taxBasis?: "cash" | "earned"
   /** Deduct real expenses and mileage, or the flat trading allowance instead ("auto" picks whichever means less tax). */
@@ -249,7 +251,7 @@ export const plural = (n: number, w: string, p?: string) => `${n} ${n === 1 ? w 
 export const initials = (name: string) =>
   (name || "?").trim().split(/\s+/).slice(0, 2).map((w) => w[0] || "").join("").toUpperCase() || "?"
 /** When the tax, National Insurance, mileage, allowance and savings figures were last checked against GOV.UK. */
-export const RATES_CHECKED = "2026-11-22"
+export const RATES_CHECKED = "2026-11-24"
 
 /** Sort code "123456" or "12 34 56" → "12-34-56"; null if it isn't 6 digits. */
 export function tidySortCode(v: string) {
@@ -745,6 +747,31 @@ export function class4(profit: number) {
   return { lines, tax: lines.reduce((a, l) => a + l.tax, 0) }
 }
 
+/* ---------- student loans (2026/27) ---------- */
+// GOV.UK "Repaying your student loan: what you pay" and "Rates and thresholds for employers 2026 to 2027", checked 24 Nov 2026.
+export type StudentPlan = "plan1" | "plan2" | "plan4" | "plan5" | "pg"
+export const STUDENT_PLANS: [StudentPlan, string, number, number][] = [
+  ["plan1", "Plan 1", 26900, 0.09], ["plan2", "Plan 2", 29385, 0.09], ["plan4", "Plan 4 (Scotland)", 33795, 0.09],
+  ["plan5", "Plan 5", 25000, 0.09], ["pg", "Postgraduate Loan", 21000, 0.06],
+]
+/**
+ * A year's student loan repayment on an income: 9% over the lowest threshold of the undergraduate plans held,
+ * plus 6% over £21,000 for a Postgraduate Loan.
+ */
+export function studentLoanRepay(income: number, plans: StudentPlan[] = []) {
+  const ug = STUDENT_PLANS.filter(([k]) => k !== "pg" && plans.includes(k))
+  const lowest = ug.length ? Math.min(...ug.map((x) => x[2])) : null
+  const a = lowest === null ? 0 : Math.max(0, income - lowest) * 0.09
+  const b = plans.includes("pg") ? Math.max(0, income - 21000) * 0.06 : 0
+  return a + b
+}
+/**
+ * The extra student loan paid through Self Assessment because of self-employed profit: repayments on
+ * salary + profit, less what payroll already takes from the salary.
+ */
+export const studentLoanOnProfit = (salary: number, profit: number, plans: StudentPlan[] = []) =>
+  Math.max(0, studentLoanRepay(salary + profit, plans) - studentLoanRepay(salary, plans))
+
 /** Tax-free allowance on gross rental income (used instead of rental expenses, which aren't recorded). */
 export const PROPERTY_ALLOWANCE = 1000
 /**
@@ -783,7 +810,16 @@ export type TaxSummary = {
   /** Income tax caused by self-employment and rent (on top of tax on a salary). */
   incomeTaxDue: number
   ni: ReturnType<typeof class4>
+  /** Income tax and Class 4 NI. */
   total: number
+  /** Student loan repayments caused by self-employed profit (paid through Self Assessment). */
+  studentLoan: number
+  /** Everything to set aside: income tax, Class 4 NI and student loan. */
+  reserve: number
+  /** Self-employed income, less expenses paid and the reserve. */
+  takeHome: number
+  /** Share of each extra £1 of self-employed income to set aside, at today's level of income. */
+  nextRate: number
   /** Share of the tax year that has passed (0–1). */
   elapsed: number
 }
@@ -836,7 +872,15 @@ export function taxSummary(d: Data, yearOf = today()): TaxSummary {
   const property = { income: rentIncome, allowance: y.propertyAllowance, taxable: y.propertyTaxable, count: rent.length }
   const t = today()
   const elapsed = t < ty.from ? 0 : t > ty.to ? 1 : Math.min(1, (daysBetween(ty.from, t) + 1) / 365)
-  return { year: ty, income, incomeLines, expenses, byCategory, miles, mileage, method, allowance, compare, profit, property, tax, incomeTaxDue, ni, total: y.total, elapsed }
+  const plans = p.studentLoans || []
+  const studentLoan = studentLoanOnProfit(salary, profit, plans)
+  const reserve = y.total + studentLoan
+  // What the next £100 of self-employed income would add (expenses/allowance unchanged)
+  const plus = yearTax({ trading: profit + 100, property: rentIncome, salary, scotland: !!p.scotland }).total + studentLoanOnProfit(salary, profit + 100, plans)
+  const nextRate = Math.max(0, (plus - reserve) / 100)
+  // Includes rent when there is any, since the reserve includes the tax on it
+  const takeHome = income + rentIncome - expenses - reserve
+  return { year: ty, income, incomeLines, expenses, byCategory, miles, mileage, method, allowance, compare, profit, property, tax, incomeTaxDue, ni, total: y.total, studentLoan, reserve, takeHome, nextRate, elapsed }
 }
 /** Tax years that have any activity, newest first (always includes the current one). */
 export function taxYearsWithData(d: Data) {

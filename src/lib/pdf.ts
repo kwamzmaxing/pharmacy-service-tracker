@@ -165,8 +165,9 @@ export function taxSummaryPdf(t: TaxSummary, who: string, opts: { scotland: bool
   section("National Insurance")
   if (!t.ni.lines.length) row("Profit below the Class 4 threshold", money(0), false, 3)
   for (const l of t.ni.lines) row(`${l.label} on ${money(l.amount)}`, money(l.tax), false, 3)
+  if (t.studentLoan > 0) { section("Student loan"); row("Repayments on your self-employed profit (through Self Assessment)", money(t.studentLoan), true) }
   y += 2; rule(doc, y - 4, 0.6, INK)
-  doc.setFontSize(12); row("Estimated total to pay", money(t.total), true); doc.setFontSize(10)
+  doc.setFontSize(12); row(t.studentLoan > 0 ? "Estimated total to set aside" : "Estimated total to pay", money(t.reserve), true); doc.setFontSize(10)
   y += 6
   doc.setFontSize(8.5); doc.setTextColor(...MUTED)
   const notes = [
@@ -174,7 +175,7 @@ export function taxSummaryPdf(t: TaxSummary, who: string, opts: { scotland: bool
     `${t.year.label} rates: personal allowance £12,570; Class 4 National Insurance 6% on profits £12,570–£50,270 and 2% above; trading allowance ${money(t.allowance)}; mileage ${Math.round(t.mileage.rates.first * 100)}p a mile for the first 10,000 business miles, then ${Math.round(t.mileage.rates.after * 100)}p.`,
     `Expenses or trading allowance: claiming expenses and mileage gives tax and NI of ${money(t.compare.expenses.total)}; the trading allowance gives ${money(t.compare.allowance.total)}. This estimate uses ${t.method === "allowance" ? "the trading allowance" : "expenses and mileage"}. You can't claim both.`,
     ...(t.property.income > 0 ? ["Rental income uses the £1,000 property allowance instead of actual rental expenses, with no National Insurance (it is voluntary on rental income). If your rental expenses are more than £1,000, claiming them instead would lower the tax."] : []),
-    "This is an estimate to help you plan. It is not financial or tax advice and doesn’t include student loans, pension contributions, savings interest, dividends or payments on account. Check your figures with HMRC or an accountant before filing.",
+    "This is an estimate to help you plan. It is not financial or tax advice and doesn’t include pension contributions, savings interest, dividends or payments on account. Check your figures with HMRC or an accountant before filing.",
   ]
   for (const n of notes) { const t2 = doc.splitTextToSize(n, R - L) as string[]; if (y + t2.length * 4 > 285) { doc.addPage(); y = 22 } doc.text(t2, L, y); y += t2.length * 4 + 2 }
   return doc

@@ -95,7 +95,7 @@ export function HomeTab() {
     { tab: "invoices", icon: <FileText />, title: "Invoices", text: "Create, send, chase and mark as paid.", stat: open.length ? `${plural(open.length, "unpaid invoice")}` : "Nothing outstanding" },
     { tab: "insights", icon: <ChartColumn />, title: "Insights", text: "Services delivered, revenue by service, payment times and monthly trends.", stat: `${money(workTotal)} of work in ${tax.year.label}` },
     { tab: "expenses", icon: <Receipt />, title: "Expenses", text: "Costs and receipt photos, ready for your tax return.", stat: `${money(tax.expenses)} in ${tax.year.label}` },
-    { tab: "tax", icon: <Calculator />, title: "Tax", text: "Income tax and National Insurance, estimated as you go.", stat: `About ${money(tax.total)} so far` },
+    { tab: "tax", icon: <Calculator />, title: "Tax", text: "Income tax and National Insurance, estimated as you go.", stat: `Put aside about ${money(tax.reserve)} so far` },
     { tab: "budget", icon: <ChartPie />, title: "Accounting", text: "Share out what comes in: tax, bills, savings and spending.", stat: data.budget.active === "custom" && data.budget.custom.length ? plural(data.budget.custom.length, "pot") + " in your split" : "Suggested split ready" },
     { tab: "clients", icon: <Store />, title: "Pharmacies", text: "Saved details and how quickly each one pays.", stat: plural(data.clients.length, "pharmacy", "pharmacies") + " saved" },
     { tab: "account", icon: <Settings />, title: "Settings", text: "Invoice details, Gmail, calendar, appearance.", stat: google.gmail === "ready" ? "Gmail connected" : "Gmail not connected" },
@@ -123,8 +123,8 @@ export function HomeTab() {
           foot={<span className="text-[12px] text-muted-foreground">{ready.length ? `${plural(ready.length, "invoice")} ready to create · oldest ${fmtDate(ready[0].oldest)}` : "Everything’s invoiced"}</span>} />
         <StatCard label="Payments overdue" value={money(overdue.reduce((a, i) => a + i.total, 0))} alert={overdue.length > 0} onClick={() => (due.length ? showFollowUps() : go("invoices"))}
           foot={<span className="text-[12px] text-muted-foreground">{overdue.length ? `${plural(overdue.length, "invoice")} · oldest ${plural(Math.max(...overdue.map((i) => daysBetween(i.due, t))), "day")} late` : "Nothing overdue"}</span>} />
-        <StatCard label="Estimated tax reserve" value={money(tax.total)} onClick={() => go("tax")}
-          foot={<span className="text-[12px] text-muted-foreground">Income tax and NI for {tax.year.label} so far. A guide, not financial advice</span>} />
+        <StatCard label="Estimated tax reserve" value={money(tax.reserve)} onClick={() => go("tax")}
+          foot={<span className="text-[12px] text-muted-foreground">{tax.nextRate > 0 ? `Put aside ${Math.ceil(tax.nextRate * 100)}% of each payment · ` : ""}{tax.year.label} so far. A guide, not financial advice</span>} />
       </div>
 
       <NextSteps extras={todo} />
