@@ -153,9 +153,88 @@ export function LineChart({ points, series, format, axis, ariaLabel, empty }: {
   )
 }
 
+export type Column = { label: string; long?: string; value: number; note?: string }
+/**
+ * Monthly totals as columns on one axis (magnitude per period), with a dashed average line,
+ * a hover/tap tooltip, and a table view. One series, so one colour.
+ */
+export function ColumnChart({ points, format, axis, ariaLabel, empty, avgLabel = "Monthly average" }: {
+  points: Column[]; format: (v: number) => string; axis: (v: number) => string; ariaLabel: string; empty?: string; avgLabel?: string
+}) {
+  const wrap = useRef<HTMLDivElement>(null)
+  const [w, setW] = useState(600)
+  const [hover, setHover] = useState<number | null>(null)
+  const [table, setTable] = useState(false)
+  useEffect(() => {
+    const el = wrap.current
+    if (!el) return
+    const ro = new ResizeObserver(() => setW(el.clientWidth || 600))
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [table])
+  const h = 230, padL = 46, padR = 10, padT = 16, padB = 26
+  const isEmpty = points.every((p) => !p.value)
+  const avg = points.length ? points.reduce((a, p) => a + p.value, 0) / points.length : 0
+  const max = niceMax(Math.max(0, ...points.map((p) => p.value)))
+  const plotW = Math.max(120, w - padL - padR)
+  const slot = plotW / Math.max(1, points.length)
+  const barW = Math.max(3, Math.min(40, slot - 2 * Math.max(2, slot * 0.18)))
+  const cx = (i: number) => padL + slot * (i + 0.5)
+  const y = (v: number) => padT + (h - padT - padB) * (1 - v / max)
+  const step = Math.ceil(points.length / Math.max(2, Math.floor(plotW / 48)))
+  const bar = (i: number, v: number) => {
+    const x0 = cx(i) - barW / 2, top = y(v), base = y(0), r = Math.min(4, barW / 2, base - top)
+    if (base - top < 0.5) return ""
+    return `M${x0},${base} V${top + r} Q${x0},${top} ${x0 + r},${top} H${x0 + barW - r} Q${x0 + barW},${top} ${x0 + barW},${top + r} V${base} Z`
+  }
+
+  return (
+    <div className="grid gap-3">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <span className="flex items-center gap-1.5 text-[12.5px] text-muted-foreground">
+          {!isEmpty && <><span className="w-3.5 border-t-2 border-dashed border-muted-foreground" aria-hidden />{avgLabel}: <span className="num font-medium text-foreground">{format(avg)}</span></>}
+        </span>
+        <button type="button" className="text-[12.5px] font-semibold text-brand-ink hover:underline" onClick={() => setTable(!table)} aria-pressed={table}>{table ? "Show chart" : "Show as table"}</button>
+      </div>
+      {table ? (
+        <div className="max-h-[280px] overflow-auto">
+          <table className="w-full text-[13px]">
+            <thead><tr className="text-left text-[11px] uppercase tracking-[0.06em] text-muted-foreground"><th className="py-1.5 font-bold">Month</th><th className="py-1.5 text-right font-bold">Revenue</th></tr></thead>
+            <tbody className="divide-y">{points.map((p) => <tr key={p.long || p.label}><td className="py-1.5">{p.long || p.label}{p.note ? ` (${p.note})` : ""}</td><td className="num py-1.5 text-right">{format(p.value)}</td></tr>)}</tbody>
+          </table>
+        </div>
+      ) : (
+        <div ref={wrap} className="relative" onMouseLeave={() => setHover(null)}>
+          <svg width="100%" height={h} viewBox={`0 0 ${w} ${h}`} role="img" aria-label={ariaLabel} className="block overflow-visible">
+            {[0, max / 2, max].map((t) => (
+              <g key={t}>
+                <line x1={padL} x2={w - padR} y1={y(t)} y2={y(t)} stroke="hsl(var(--border))" strokeWidth={1} strokeDasharray={t === 0 ? undefined : "2 4"} />
+                <text x={padL - 8} y={y(t)} dy="0.32em" textAnchor="end" className="num fill-muted-foreground text-[11px]">{axis(t)}</text>
+              </g>
+            ))}
+            {!isEmpty && points.map((p, i) => <path key={i} d={bar(i, p.value)} fill="var(--series-logged)" opacity={hover === null || hover === i ? 1 : 0.45} />)}
+            {!isEmpty && <line x1={padL} x2={w - padR} y1={y(avg)} y2={y(avg)} stroke="hsl(var(--muted-foreground))" strokeWidth={1.5} strokeDasharray="5 4" />}
+            {points.map((p, i) => (i % step === 0 || i === points.length - 1) && <text key={i} x={cx(i)} y={h - 8} textAnchor="middle" className="fill-muted-foreground text-[11px]">{p.label}</text>)}
+            {points.map((_, i) => <rect key={i} x={cx(i) - slot / 2} y={0} width={slot} height={h} fill="transparent" onMouseEnter={() => setHover(i)} onClick={() => setHover(hover === i ? null : i)} />)}
+          </svg>
+          {isEmpty && <p className="pointer-events-none absolute inset-x-0 top-16 text-center text-[13px] text-muted-foreground">{empty || "Nothing to show yet."}</p>}
+          {hover !== null && !isEmpty && (
+            <div role="status" className="pointer-events-none absolute z-10 w-max min-w-[140px] max-w-[240px] -translate-x-1/2 rounded-md border bg-popover px-3 py-2 text-[12.5px] shadow-md"
+              style={{ left: Math.min(Math.max(cx(hover), 78), w - 78), top: Math.max(0, y(points[hover].value) - 64) }}>
+              <div className="font-semibold">{points[hover].long || points[hover].label}</div>
+              <div className="num mt-0.5 font-semibold">{format(points[hover].value)}</div>
+              <div className="text-muted-foreground">{points[hover].note || (avg > 0 ? `${points[hover].value >= avg ? "Above" : "Below"} the average` : "")}</div>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
 /** Horizontal bars for ranked counts (one series, so one colour; labels and values in text ink). */
 export function BarList({ rows, format = (v) => String(v), color = "var(--series-logged)", empty }: {
-  rows: { label: string; value: number }[]; format?: (v: number) => string; color?: string; empty?: string
+  rows: { label: string; value: number; note?: string }[]; format?: (v: number) => string; color?: string; empty?: string
 }) {
   const max = Math.max(1, ...rows.map((r) => r.value))
   if (!rows.length) return <p className="text-[13px] text-muted-foreground">{empty || "Nothing yet."}</p>
@@ -165,8 +244,9 @@ export function BarList({ rows, format = (v) => String(v), color = "var(--series
         <li key={r.label} className="grid grid-cols-[1fr_auto] items-center gap-x-3 gap-y-1 text-[13px]">
           <span className="min-w-0 truncate">{r.label}</span>
           <span className="num font-medium">{format(r.value)}</span>
+          {r.note && <span className="col-span-2 -mt-1 text-[12px] text-muted-foreground">{r.note}</span>}
           <span className="col-span-2 h-[6px] overflow-hidden rounded-full bg-secondary" aria-hidden>
-            <span className="block h-full rounded-full" style={{ width: `${Math.max(2, (r.value / max) * 100)}%`, background: color }} />
+            {r.value > 0 && <span className="block h-full rounded-full" style={{ width: `${Math.max(2, (r.value / max) * 100)}%`, background: color }} />}
           </span>
         </li>
       ))}

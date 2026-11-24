@@ -4,7 +4,7 @@ import type { OutboxItem, PublicSettings } from "@/lib/cloud"
 import type { ConnStatus, GoogleArea } from "@/lib/google"
 import type { ThemePref } from "@/lib/theme"
 
-export type Tab = "home" | "shifts" | "log" | "summary" | "invoices" | "expenses" | "tax" | "budget" | "clients" | "services" | "account" | "admin"
+export type Tab = "home" | "shifts" | "log" | "summary" | "invoices" | "insights" | "expenses" | "tax" | "budget" | "clients" | "services" | "account" | "admin"
 export type LogMode = "service" | "hours" | "journey"
 export type EmailKind = "invoice" | "followup"
 export type Me = { uid: string; email: string; name: string; emailVerified: boolean; viaGoogle: boolean }

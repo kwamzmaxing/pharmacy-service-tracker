@@ -14,9 +14,9 @@ export default defineConfig({
       registerType: "autoUpdate",
       includeAssets: ["favicon.svg", "apple-touch-icon.png", "reminders-sw.js"],
       manifest: {
-        name: "KASA.Rx · Pharmacy service tracker",
+        name: "KASA.Rx · Pharmacy services platform",
         short_name: "KASA.Rx",
-        description: "Log locum shifts, services and mileage, send invoices and track tax.",
+        description: "The operating and financial management platform for pharmacy services: log shifts, services and mileage, send invoices, chase payments and plan for tax.",
         theme_color: "#171721",
         background_color: "#171721",
         display: "standalone",

@@ -1,4 +1,4 @@
-// Data model and pure helpers for the service tracker.
+// Data model and pure helpers for KASA.Rx.
 
 export type Unit = "each" | "mile" | "hour"
 export type Service = { id: string; name: string; fee: number; unit?: Unit }
@@ -461,8 +461,10 @@ export const pendingFor = (d: Data, r: Range, clientId?: string) =>
   d.entries.filter((e) => inRange(r, e.date) && !e.invoiced && (!clientId || !e.clientId || e.clientId === clientId))
 
 /** Build an invoice from the entries in range that aren't on an invoice yet. */
-export function draftInvoice(d: Data, r: Range, fallbackName: string, clientId?: string) {
-  const pend = pendingFor(d, r, clientId)
+export function draftInvoice(d: Data, r: Range, fallbackName: string, clientId?: string, opts: { strict?: boolean; period?: string } = {}) {
+  // strict: only this pharmacy's own work, done by today (used for the automatic "ready to invoice" groups)
+  const t = today()
+  const pend = pendingFor(d, r, clientId).filter((e) => !opts.strict || (e.clientId === clientId && e.date <= t))
   if (!pend.length) return null
   const svc = (id: string) => d.services.find((s) => s.id === id)
   const groups: Record<string, InvoiceLine> = {}
@@ -483,8 +485,8 @@ export function draftInvoice(d: Data, r: Range, fallbackName: string, clientId?:
   const p = d.profile
   const client = clientId ? d.clients.find((c) => c.id === clientId) : undefined
   const issued = today()
-  const period =
-    r.mode === "month" || r.mode === "last" ? rangeLabel(r) : first === last ? fmtDate(first) : `${fmtDate(first)} – ${fmtDate(last)}`
+  const period = opts.period ||
+    (r.mode === "month" || r.mode === "last" ? rangeLabel(r) : first === last ? fmtDate(first) : `${fmtDate(first)} – ${fmtDate(last)}`)
   const inv: Invoice = {
     id: uid(), number: nextNumber(p), issued, due: dueDate(issued, p.terms), terms: p.terms, period,
     from: { name: p.fullName || fallbackName, trading: p.tradingName, address: p.address, phone: p.phone, email: p.email, gphc: p.gphc },
@@ -497,16 +499,32 @@ export function draftInvoice(d: Data, r: Range, fallbackName: string, clientId?:
   return inv
 }
 
+/**
+ * How firm the next reminder should be: a friendly first nudge, a firmer second one, then a firm request
+ * with a deadline once it's a month late or has had two reminders already.
+ */
+export type ReminderStage = 1 | 2 | 3
+export function reminderStage(inv: Invoice, on = today()): ReminderStage {
+  const late = daysBetween(inv.due, on), sent = inv.reminders.length
+  if (sent >= 2 || late >= 30) return 3
+  if (sent >= 1 || late >= 14) return 2
+  return 1
+}
+export const REMINDER_STAGE: Record<ReminderStage, string> = { 1: "Friendly reminder", 2: "Second reminder", 3: "Firm reminder" }
+
 export function reminderText(inv: Invoice, p: Profile) {
   const late = daysBetween(inv.due, today())
-  const subject = `Payment reminder: invoice ${inv.number} (${money(inv.total)})`
-  const lines = [
-    `Dear ${inv.to.name || "Sir or Madam"},`,
-    "",
-    `This is a friendly reminder that invoice ${inv.number} for ${money(inv.total)}, issued on ${fmtDate(inv.issued)} for services in ${inv.period}, was due for payment on ${fmtDate(inv.due)}` +
-      (late > 0 ? ` and is now ${plural(late, "day")} overdue.` : "."),
-    "",
-  ]
+  const stage = reminderStage(inv)
+  const what = `invoice ${inv.number} for ${money(inv.total)}, issued on ${fmtDate(inv.issued)} for services in ${inv.period}`
+  const subject = stage === 1 ? `Payment reminder: invoice ${inv.number} (${money(inv.total)})`
+    : stage === 2 ? `Second reminder: invoice ${inv.number} (${money(inv.total)}) is overdue`
+    : `Overdue invoice ${inv.number} (${money(inv.total)}): payment needed`
+  const opening = stage === 1
+    ? `This is a friendly reminder that ${what}, was due for payment on ${fmtDate(inv.due)}` + (late > 0 ? ` and is now ${plural(late, "day")} overdue.` : ".")
+    : stage === 2
+      ? `I’m following up on ${what}. It was due on ${fmtDate(inv.due)} and is now ${plural(Math.max(0, late), "day")} overdue. Please could you arrange payment as soon as possible, or let me know if there is a problem with the invoice.`
+      : `${what[0].toUpperCase() + what.slice(1)}, is now ${plural(Math.max(0, late), "day")} overdue (it was due on ${fmtDate(inv.due)})${inv.reminders.length ? `, and I have sent ${plural(inv.reminders.length, "reminder")} already` : ""}. Please arrange payment within 7 days, or contact me straight away if anything is holding it up.`
+  const lines = [`Dear ${inv.to.name || "Sir or Madam"},`, "", opening, ""]
   const pay = inv.pay
   if (pay.sortCode || pay.accountNumber) {
     lines.push("Payment can be made to:")
