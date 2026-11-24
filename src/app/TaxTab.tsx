@@ -12,6 +12,7 @@ import { useApp } from "./ctx"
 import { Chips, MoneyField, Panel } from "./bits"
 import { MtdPanel } from "./MtdPanel"
 import { TaxReserve } from "./TaxReserve"
+import { StructureCompare } from "./StructureCompare"
 import { BASICS, DATES, EXPENSE_TIPS, GuideNote, HELP, PAYE, Tips } from "./TaxGuide"
 import { ExternalLink } from "lucide-react"
 
@@ -222,6 +223,9 @@ export function TaxTab() {
           <a href="https://www.gov.uk/guidance/tax-free-allowances-on-property-and-trading-income" target="_blank" rel="noopener noreferrer" className="font-medium text-brand-ink hover:underline">GOV.UK</a> · <a href="https://www.gov.uk/government/publications/income-tax-increasing-the-trading-allowance" target="_blank" rel="noopener noreferrer" className="font-medium text-brand-ink hover:underline">£3,000 from April 2027</a>. A guide, not financial advice.
         </p>
       </Panel>
+
+      <StructureCompare key={t.year.from} openAccountant={openAccountant} otherSalary={other} scotland={!!p.scotland}
+        profit={canProject ? Math.max(0, t.income / t.elapsed - (t.method === "allowance" ? t.allowance : realCosts / t.elapsed)) : t.profit} />
 
       <MtdPanel startYear={startYear} />
 

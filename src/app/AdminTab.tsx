@@ -11,6 +11,7 @@ import { GOOGLE_HELP, GoogleError, hasToken, sendMail, writeSheet } from "@/lib/
 import { useApp } from "./ctx"
 import { AdminDashboard } from "./AdminDashboard"
 import { clearError, listErrors, type ErrorReport } from "@/lib/errors"
+import { applyRetention } from "@/lib/retention"
 import { listRequests, markEmailed, requestEmail, setRequestStatus, type AccountantRequest, type RequestStatus } from "@/lib/accountant"
 import { CONTACT_EMAIL } from "./brand"
 import { Empty, Field, Panel } from "./bits"
@@ -47,6 +48,8 @@ export function AdminTab() {
     }
   }, [])
   useEffect(() => { reload() }, [reload])
+  // Delete records past the retention periods in the privacy policy, then refresh if anything went
+  useEffect(() => { applyRetention().then((n) => { if (n) reload() }).catch(() => {}) }, [reload])
 
   async function update(patch: Partial<PublicSettings>, quiet = false) {
     const next = { adminName: data.profile.fullName || me.name || "Admin", relay: true, ...(settings || {}), ...patch }
