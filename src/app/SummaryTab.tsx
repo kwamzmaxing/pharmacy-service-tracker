@@ -3,16 +3,16 @@ import { Button } from "@/components/ui/button"
 import { ArrowLeft } from "lucide-react"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectSeparator, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { addCalendarEvent, hasToken } from "@/lib/google"
-import { draftInvoice, entryAmt, inRange, money, pendingFor, plural, qtyText, rangeLabel, unitOf, type Range, type RangeMode, type Unit } from "@/lib/model"
+import { entryAmt, inRange, money, pendingFor, plural, qtyText, rangeLabel, unitOf, type Range, type RangeMode, type Unit } from "@/lib/model"
 import { useApp } from "./ctx"
+import { useCreateInvoice } from "./useCreateInvoice"
 import { Callout, Chips, Empty, Field, Panel } from "./bits"
 import { ClientForm, newClient } from "./ClientsTab"
 
 const NEW = "__new"
 
 export function SummaryTab() {
-  const { data, commit, ask, go, viewInvoice, me, google } = useApp()
+  const { data, commit, go } = useApp()
   const [range, setRange] = useState<Range>({ mode: "month", from: "", to: "" })
   const remembered = data.meta.lastClientId as string | undefined
   const [clientId, setClientId] = useState<string>(
@@ -40,30 +40,9 @@ export function SummaryTab() {
   const p = data.profile
   const missing = [!p.fullName && "your name", !(p.sortCode && p.accountNumber) && "your bank details"].filter(Boolean)
 
+  const createInvoice = useCreateInvoice()
   async function create() {
-    if (!client) return
-    const inv = draftInvoice(data, range, p.fullName || me.name || me.email, client.id)
-    if (!inv) return
-    const ok = await ask({
-      title: "Create invoice",
-      message: `Create ${inv.number} for ${money(inv.total)} to ${client.name}?\n\n${plural(inv.entryIds.length, "entry", "entries")} will be marked as invoiced.`,
-      ok: "Create invoice",
-    })
-    if (!ok) return
-    commit((d) => {
-      d.invoices.push(inv)
-      d.profile.nextNo = (Number(d.profile.nextNo) || 1) + 1
-      d.meta.lastClientId = client.id
-      const ids = new Set(inv.entryIds)
-      for (const e of d.entries) if (ids.has(e.id)) Object.assign(e, { invoiced: true, invoiceId: inv.id, clientId: client.id })
-    }, `Invoice ${inv.number} saved ✓`)
-    viewInvoice(inv.id, true)
-    // Put the payment date in Google Calendar straight away when it's connected and Google already gave access this visit
-    if (p.calendar && google.calendar === "ready" && hasToken("calendar")) {
-      addCalendarEvent({ title: `Payment due: ${inv.number} · ${money(inv.total)}`, date: inv.due, details: `Expected payment for ${inv.number} from ${client.name}: ${money(inv.total)}.` }, me.email)
-        .then(() => commit((d) => void (d.invoices.find((x) => x.id === inv.id)!.calendarAt = new Date().toISOString()), `Added ${inv.due.split("-").reverse().join("/")} to your Google Calendar ✓`))
-        .catch(() => {})
-    }
+    if (client) await createInvoice(client.id, range)
   }
 
   return (

@@ -1,4 +1,4 @@
-// Data model and pure helpers for the service tracker.
+// Data model and pure helpers for KASA.Rx.
 
 export type Unit = "each" | "mile" | "hour"
 export type Service = { id: string; name: string; fee: number; unit?: Unit }
@@ -31,6 +31,8 @@ export type Entry = {
 export type Terms = "14th" | "0" | "7" | "14" | "30"
 export type Profile = {
   fullName: string
+  /** What they'd like to be called in greetings ("Good morning, Sam"); their first name if empty. */
+  preferredName?: string
   tradingName: string
   gphc: string
   phone: string
@@ -64,6 +66,8 @@ export type Profile = {
   scotland?: boolean
   /** Yearly income from employment (PAYE), to place self-employed profit in the right tax bands. */
   otherIncome?: number
+  /** Student loan plans they repay (none if empty). */
+  studentLoans?: StudentPlan[]
   /** Count income when it's paid (cash basis, HMRC's default) or when the work was done. */
   taxBasis?: "cash" | "earned"
   /** Deduct real expenses and mileage, or the flat trading allowance instead ("auto" picks whichever means less tax). */
@@ -247,7 +251,7 @@ export const plural = (n: number, w: string, p?: string) => `${n} ${n === 1 ? w 
 export const initials = (name: string) =>
   (name || "?").trim().split(/\s+/).slice(0, 2).map((w) => w[0] || "").join("").toUpperCase() || "?"
 /** When the tax, National Insurance, mileage, allowance and savings figures were last checked against GOV.UK. */
-export const RATES_CHECKED = "2026-11-22"
+export const RATES_CHECKED = "2026-11-24"
 
 /** Sort code "123456" or "12 34 56" → "12-34-56"; null if it isn't 6 digits. */
 export function tidySortCode(v: string) {
@@ -259,6 +263,10 @@ export function tidyAccountNumber(v: string) {
   const d = v.replace(/\s/g, "")
   return /^\d{6,8}$/.test(d) ? d : null
 }
+
+/** The name to greet someone by: what they asked to be called, else their first name. */
+export const callName = (p: Pick<Profile, "preferredName" | "fullName">, fallback = "") =>
+  (p.preferredName || "").trim() || (p.fullName || fallback || "").trim().split(/\s+/)[0] || ""
 
 /** Round to whole pence. */
 export const pence = (n: number) => Math.round((Number(n) || 0) * 100) / 100
@@ -455,8 +463,10 @@ export const pendingFor = (d: Data, r: Range, clientId?: string) =>
   d.entries.filter((e) => inRange(r, e.date) && !e.invoiced && (!clientId || !e.clientId || e.clientId === clientId))
 
 /** Build an invoice from the entries in range that aren't on an invoice yet. */
-export function draftInvoice(d: Data, r: Range, fallbackName: string, clientId?: string) {
-  const pend = pendingFor(d, r, clientId)
+export function draftInvoice(d: Data, r: Range, fallbackName: string, clientId?: string, opts: { strict?: boolean; period?: string } = {}) {
+  // strict: only this pharmacy's own work, done by today (used for the automatic "ready to invoice" groups)
+  const t = today()
+  const pend = pendingFor(d, r, clientId).filter((e) => !opts.strict || (e.clientId === clientId && e.date <= t))
   if (!pend.length) return null
   const svc = (id: string) => d.services.find((s) => s.id === id)
   const groups: Record<string, InvoiceLine> = {}
@@ -477,8 +487,8 @@ export function draftInvoice(d: Data, r: Range, fallbackName: string, clientId?:
   const p = d.profile
   const client = clientId ? d.clients.find((c) => c.id === clientId) : undefined
   const issued = today()
-  const period =
-    r.mode === "month" || r.mode === "last" ? rangeLabel(r) : first === last ? fmtDate(first) : `${fmtDate(first)} – ${fmtDate(last)}`
+  const period = opts.period ||
+    (r.mode === "month" || r.mode === "last" ? rangeLabel(r) : first === last ? fmtDate(first) : `${fmtDate(first)} – ${fmtDate(last)}`)
   const inv: Invoice = {
     id: uid(), number: nextNumber(p), issued, due: dueDate(issued, p.terms), terms: p.terms, period,
     from: { name: p.fullName || fallbackName, trading: p.tradingName, address: p.address, phone: p.phone, email: p.email, gphc: p.gphc },
@@ -491,16 +501,32 @@ export function draftInvoice(d: Data, r: Range, fallbackName: string, clientId?:
   return inv
 }
 
+/**
+ * How firm the next reminder should be: a friendly first nudge, a firmer second one, then a firm request
+ * with a deadline once it's a month late or has had two reminders already.
+ */
+export type ReminderStage = 1 | 2 | 3
+export function reminderStage(inv: Invoice, on = today()): ReminderStage {
+  const late = daysBetween(inv.due, on), sent = inv.reminders.length
+  if (sent >= 2 || late >= 30) return 3
+  if (sent >= 1 || late >= 14) return 2
+  return 1
+}
+export const REMINDER_STAGE: Record<ReminderStage, string> = { 1: "Friendly reminder", 2: "Second reminder", 3: "Firm reminder" }
+
 export function reminderText(inv: Invoice, p: Profile) {
   const late = daysBetween(inv.due, today())
-  const subject = `Payment reminder: invoice ${inv.number} (${money(inv.total)})`
-  const lines = [
-    `Dear ${inv.to.name || "Sir or Madam"},`,
-    "",
-    `This is a friendly reminder that invoice ${inv.number} for ${money(inv.total)}, issued on ${fmtDate(inv.issued)} for services in ${inv.period}, was due for payment on ${fmtDate(inv.due)}` +
-      (late > 0 ? ` and is now ${plural(late, "day")} overdue.` : "."),
-    "",
-  ]
+  const stage = reminderStage(inv)
+  const what = `invoice ${inv.number} for ${money(inv.total)}, issued on ${fmtDate(inv.issued)} for services in ${inv.period}`
+  const subject = stage === 1 ? `Payment reminder: invoice ${inv.number} (${money(inv.total)})`
+    : stage === 2 ? `Second reminder: invoice ${inv.number} (${money(inv.total)}) is overdue`
+    : `Overdue invoice ${inv.number} (${money(inv.total)}): payment needed`
+  const opening = stage === 1
+    ? `This is a friendly reminder that ${what}, was due for payment on ${fmtDate(inv.due)}` + (late > 0 ? ` and is now ${plural(late, "day")} overdue.` : ".")
+    : stage === 2
+      ? `I’m following up on ${what}. It was due on ${fmtDate(inv.due)} and is now ${plural(Math.max(0, late), "day")} overdue. Please could you arrange payment as soon as possible, or let me know if there is a problem with the invoice.`
+      : `${what[0].toUpperCase() + what.slice(1)}, is now ${plural(Math.max(0, late), "day")} overdue (it was due on ${fmtDate(inv.due)})${inv.reminders.length ? `, and I have sent ${plural(inv.reminders.length, "reminder")} already` : ""}. Please arrange payment within 7 days, or contact me straight away if anything is holding it up.`
+  const lines = [`Dear ${inv.to.name || "Sir or Madam"},`, "", opening, ""]
   const pay = inv.pay
   if (pay.sortCode || pay.accountNumber) {
     lines.push("Payment can be made to:")
@@ -721,6 +747,31 @@ export function class4(profit: number) {
   return { lines, tax: lines.reduce((a, l) => a + l.tax, 0) }
 }
 
+/* ---------- student loans (2026/27) ---------- */
+// GOV.UK "Repaying your student loan: what you pay" and "Rates and thresholds for employers 2026 to 2027", checked 24 Nov 2026.
+export type StudentPlan = "plan1" | "plan2" | "plan4" | "plan5" | "pg"
+export const STUDENT_PLANS: [StudentPlan, string, number, number][] = [
+  ["plan1", "Plan 1", 26900, 0.09], ["plan2", "Plan 2", 29385, 0.09], ["plan4", "Plan 4 (Scotland)", 33795, 0.09],
+  ["plan5", "Plan 5", 25000, 0.09], ["pg", "Postgraduate Loan", 21000, 0.06],
+]
+/**
+ * A year's student loan repayment on an income: 9% over the lowest threshold of the undergraduate plans held,
+ * plus 6% over £21,000 for a Postgraduate Loan.
+ */
+export function studentLoanRepay(income: number, plans: StudentPlan[] = []) {
+  const ug = STUDENT_PLANS.filter(([k]) => k !== "pg" && plans.includes(k))
+  const lowest = ug.length ? Math.min(...ug.map((x) => x[2])) : null
+  const a = lowest === null ? 0 : Math.max(0, income - lowest) * 0.09
+  const b = plans.includes("pg") ? Math.max(0, income - 21000) * 0.06 : 0
+  return a + b
+}
+/**
+ * The extra student loan paid through Self Assessment because of self-employed profit: repayments on
+ * salary + profit, less what payroll already takes from the salary.
+ */
+export const studentLoanOnProfit = (salary: number, profit: number, plans: StudentPlan[] = []) =>
+  Math.max(0, studentLoanRepay(salary + profit, plans) - studentLoanRepay(salary, plans))
+
 /** Tax-free allowance on gross rental income (used instead of rental expenses, which aren't recorded). */
 export const PROPERTY_ALLOWANCE = 1000
 /**
@@ -759,7 +810,16 @@ export type TaxSummary = {
   /** Income tax caused by self-employment and rent (on top of tax on a salary). */
   incomeTaxDue: number
   ni: ReturnType<typeof class4>
+  /** Income tax and Class 4 NI. */
   total: number
+  /** Student loan repayments caused by self-employed profit (paid through Self Assessment). */
+  studentLoan: number
+  /** Everything to set aside: income tax, Class 4 NI and student loan. */
+  reserve: number
+  /** Self-employed income, less expenses paid and the reserve. */
+  takeHome: number
+  /** Share of each extra £1 of self-employed income to set aside, at today's level of income. */
+  nextRate: number
   /** Share of the tax year that has passed (0–1). */
   elapsed: number
 }
@@ -812,7 +872,15 @@ export function taxSummary(d: Data, yearOf = today()): TaxSummary {
   const property = { income: rentIncome, allowance: y.propertyAllowance, taxable: y.propertyTaxable, count: rent.length }
   const t = today()
   const elapsed = t < ty.from ? 0 : t > ty.to ? 1 : Math.min(1, (daysBetween(ty.from, t) + 1) / 365)
-  return { year: ty, income, incomeLines, expenses, byCategory, miles, mileage, method, allowance, compare, profit, property, tax, incomeTaxDue, ni, total: y.total, elapsed }
+  const plans = p.studentLoans || []
+  const studentLoan = studentLoanOnProfit(salary, profit, plans)
+  const reserve = y.total + studentLoan
+  // What the next £100 of self-employed income would add (expenses/allowance unchanged)
+  const plus = yearTax({ trading: profit + 100, property: rentIncome, salary, scotland: !!p.scotland }).total + studentLoanOnProfit(salary, profit + 100, plans)
+  const nextRate = Math.max(0, (plus - reserve) / 100)
+  // Includes rent when there is any, since the reserve includes the tax on it
+  const takeHome = income + rentIncome - expenses - reserve
+  return { year: ty, income, incomeLines, expenses, byCategory, miles, mileage, method, allowance, compare, profit, property, tax, incomeTaxDue, ni, total: y.total, studentLoan, reserve, takeHome, nextRate, elapsed }
 }
 /** Tax years that have any activity, newest first (always includes the current one). */
 export function taxYearsWithData(d: Data) {

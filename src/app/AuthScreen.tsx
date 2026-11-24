@@ -26,6 +26,7 @@ type Mode = "in" | "up" | "forgot"
 export function AuthScreen({ notice }: { notice?: string }) {
   const [mode, setMode] = useState<Mode>("in")
   const [name, setName] = useState("")
+  const [callMe, setCallMe] = useState("")
   const [email, setEmail] = useState("")
   const [pw, setPw] = useState("")
   const [pw2, setPw2] = useState("")
@@ -56,6 +57,7 @@ export function AuthScreen({ notice }: { notice?: string }) {
       if (mode === "up") {
         // Set before creating: the app opens the account as soon as Firebase reports the log-in
         sessionStorage.setItem("pst_new_name", name.trim())
+        sessionStorage.setItem("pst_call_me", callMe.trim())
         await createAccount(name.trim(), email.trim(), pw, keep)
       } else {
         await logInWithEmail(email.trim(), pw, keep)
@@ -127,6 +129,7 @@ export function AuthScreen({ notice }: { notice?: string }) {
           <form onSubmit={submit} noValidate className="grid gap-3">
             <div ref={fields} className="grid gap-3">
               {mode === "up" && <Field id="a-name" label="Full name" autoComplete="name" placeholder="As it should appear on invoices" value={name} onChange={(e) => setName(e.target.value)} />}
+              {mode === "up" && <Field id="a-callme" label="What should we call you?" hint="(optional)" autoComplete="nickname" maxLength={40} placeholder={name.trim().split(/\s+/)[0] || "e.g. Sam"} value={callMe} onChange={(e) => setCallMe(e.target.value)} />}
               <Field id="a-email" label="Email" type="email" autoComplete={mode === "up" ? "email" : "username"} placeholder="you@example.com" value={email} onChange={(e) => setEmail(e.target.value)} />
               {mode !== "forgot" && <Field id="a-pw" label="Password" type="password" autoComplete={mode === "up" ? "new-password" : "current-password"} placeholder={mode === "up" ? "At least 8 characters" : ""} value={pw} onChange={(e) => setPw(e.target.value)} />}
               {mode === "up" && <Field id="a-pw2" label="Confirm password" type="password" autoComplete="new-password" value={pw2} onChange={(e) => setPw2(e.target.value)} />}

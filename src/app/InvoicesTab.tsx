@@ -3,11 +3,12 @@ import { Button } from "@/components/ui/button"
 import { Plus } from "lucide-react"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { cn } from "@/lib/utils"
-import { daysBetween, daysToPay, fmtDate, followUpsDue, insights, invStatus, isoOf, money, monthLabel, monthly, nextFollowUp, plural, taxYear, today, type Invoice, type Profile, type Status } from "@/lib/model"
+import { REMINDER_STAGE, daysBetween, reminderStage, daysToPay, fmtDate, followUpsDue, insights, invStatus, isoOf, money, monthLabel, monthly, nextFollowUp, plural, taxYear, today, type Invoice, type Profile, type Status } from "@/lib/model"
 import { MonthlyBars } from "./charts"
 import { useApp } from "./ctx"
 import { Callout, Chips, Empty, Ledger, Panel, Pill } from "./bits"
 import { markPaid } from "./dialogs"
+import { expectedPayment, repeatLatePayers } from "@/lib/finance"
 
 type Filter = "all" | "unpaid" | "overdue" | "paid"
 type Sort = "issued-desc" | "issued-asc" | "due"
@@ -39,6 +40,7 @@ export function InvoicesTab() {
     if (s === "overdue") o.overdue += i.total
     if (i.due < o.oldest) o.oldest = i.due
   }
+  const lateIds = new Set(repeatLatePayers(data).map((r) => r.clientId))
   const owedBy = Object.values(owedMap).sort((a, b) => b.amount - a.amount)
 
   const rows = all
@@ -119,7 +121,7 @@ export function InvoicesTab() {
                 <button type="button" disabled={!o.clientId} onClick={() => o.clientId && openClient(o.clientId)}
                   className="flex w-full items-center gap-3 py-2.5 text-left enabled:hover:bg-secondary/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
                   <span className="min-w-0 flex-1">
-                    <span className="block truncate text-[14px] font-semibold">{o.name}</span>
+                    <span className="flex min-w-0 items-center gap-2"><span className="truncate text-[14px] font-semibold">{o.name}</span>{o.clientId && lateIds.has(o.clientId) && <Pill tone="overdue">Often pays late</Pill>}</span>
                     <span className="text-[12.5px] text-muted-foreground">{plural(o.count, "invoice")} · oldest due {fmtDate(o.oldest)}{o.overdue > 0 && <> · <span className="font-semibold text-danger-ink">{money(o.overdue)} overdue</span></>}</span>
                   </span>
                   <span className="num text-[14.5px] font-bold">{money(o.amount)}</span>
@@ -155,7 +157,7 @@ export function InvoicesTab() {
                   {sort === "due" ? "Due " : ""}{monthLabel(g.key)}
                 </p>
                 <ul className="divide-y">
-                  {g.items.map(({ i, s }) => <Row key={i.id} i={i} s={s} p={data.profile} onView={() => viewInvoice(i.id)} onEmail={(k) => email(i.id, k)} onDelete={() => remove(i)} onPaid={(p) => markPaid(commit, i.id, p)} />)}
+                  {g.items.map(({ i, s }) => <Row key={i.id} i={i} s={s} p={data.profile} expected={s === "paid" ? null : expectedPayment(data, i)} late={!!i.clientId && lateIds.has(i.clientId)} onView={() => viewInvoice(i.id)} onEmail={(k) => email(i.id, k)} onDelete={() => remove(i)} onPaid={(p) => markPaid(commit, i.id, p)} />)}
                 </ul>
               </div>
             ))}
@@ -166,7 +168,7 @@ export function InvoicesTab() {
   )
 }
 
-function Row({ i, s, p, onView, onEmail, onDelete, onPaid }: { i: Invoice; s: Status; p: Profile; onView: () => void; onEmail: (k: "invoice" | "followup") => void; onDelete: () => void; onPaid: (p: boolean) => void }) {
+function Row({ i, s, p, expected, late, onView, onEmail, onDelete, onPaid }: { i: Invoice; s: Status; p: Profile; expected: ReturnType<typeof expectedPayment> | null; late: boolean; onView: () => void; onEmail: (k: "invoice" | "followup") => void; onDelete: () => void; onPaid: (p: boolean) => void }) {
   const next = nextFollowUp(i, p)
   const followDue = next !== null && today() >= next
   const dTo = daysBetween(today(), i.due)
@@ -185,7 +187,10 @@ function Row({ i, s, p, onView, onEmail, onDelete, onPaid }: { i: Invoice; s: St
           <Pill tone={s}>{LABEL[s]}</Pill>
         </div>
         <div className="num text-[12.5px] text-muted-foreground">Issued {fmtDate(i.issued)} · Due {fmtDate(i.due)} · {when}</div>
-        <div className="text-[12.5px] text-muted-foreground">{i.to.name || "No recipient"} · {i.period}</div>
+        <div className="text-[12.5px] text-muted-foreground">{i.to.name || "No recipient"} · {i.period}{late && s !== "paid" && <> · <span className="font-semibold text-danger-ink">often pays late</span></>}</div>
+        {s === "unpaid" && expected?.basis === "history" && expected.date !== i.due && (
+          <div className="text-[12.5px] text-muted-foreground">Expected around {fmtDate(expected.date)}: they usually pay {plural(expected.days!, "day")} after the invoice date</div>
+        )}
         <div className="text-[12.5px] text-muted-foreground">
           {i.sentAt ? <>Emailed {fmtDate(isoOf(new Date(i.sentAt)))}</> : i.sentVia === "admin" ? <>Queued to send</> : <span className="font-semibold text-warn">Not emailed yet</span>}
           {last && <> · {plural(i.reminders.length, "follow-up")}, last {fmtDate(isoOf(new Date(last)))}</>}
@@ -194,7 +199,7 @@ function Row({ i, s, p, onView, onEmail, onDelete, onPaid }: { i: Invoice; s: St
         <div className="mt-1 flex flex-wrap gap-1">
           <Button variant="ghost" size="sm" className="h-7 px-2 text-xs text-brand-ink" onClick={onView}>View</Button>
           {s !== "paid" && !i.sentAt && i.sentVia !== "admin" && <Button variant="ghost" size="sm" className="h-7 px-2 text-xs font-semibold text-brand-ink" onClick={() => onEmail("invoice")}>Email invoice</Button>}
-          {s !== "paid" && (i.sentAt || i.sentVia === "admin" || s === "overdue") && <Button variant="ghost" size="sm" className={cn("h-7 px-2 text-xs text-brand-ink", followDue && "font-semibold")} onClick={() => onEmail("followup")}>Send follow-up</Button>}
+          {s !== "paid" && (i.sentAt || i.sentVia === "admin" || s === "overdue") && <Button variant="ghost" size="sm" className={cn("h-7 px-2 text-xs text-brand-ink", followDue && "font-semibold")} onClick={() => onEmail("followup")}>Send {s === "overdue" ? REMINDER_STAGE[reminderStage(i)].toLowerCase() : "follow-up"}</Button>}
           <Button variant="ghost" size="sm" className="h-7 px-2 text-xs text-muted-foreground hover:text-danger-ink" onClick={onDelete}>Delete</Button>
         </div>
       </div>

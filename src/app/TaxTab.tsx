@@ -6,11 +6,13 @@ import { Label } from "@/components/ui/label"
 import { Switch } from "@/components/ui/switch"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { cn } from "@/lib/utils"
-import { RATES_CHECKED, categoryName, fmtDate, mileageRates, money, PROPERTY_ALLOWANCE, taxSummary, taxYearsWithData, tradingAllowance, yearTax, VEHICLES, type DeductionMethod, type Vehicle } from "@/lib/model"
+import { RATES_CHECKED, STUDENT_PLANS, categoryName, studentLoanOnProfit, type StudentPlan, fmtDate, mileageRates, money, PROPERTY_ALLOWANCE, taxSummary, taxYearsWithData, tradingAllowance, yearTax, VEHICLES, type DeductionMethod, type Vehicle } from "@/lib/model"
 import { saveFile } from "@/lib/store"
 import { useApp } from "./ctx"
-import { Chips, Ledger, MoneyField, Panel } from "./bits"
+import { Chips, MoneyField, Panel } from "./bits"
 import { MtdPanel } from "./MtdPanel"
+import { TaxReserve } from "./TaxReserve"
+import { StructureCompare } from "./StructureCompare"
 import { BASICS, DATES, EXPENSE_TIPS, GuideNote, HELP, PAYE, Tips } from "./TaxGuide"
 import { ExternalLink } from "lucide-react"
 
@@ -28,14 +30,19 @@ export function TaxTab() {
   // If the rest of the year goes like this: scale this year's figures to a full year
   const canProject = current && t.elapsed >= 0.08
   const other = Math.max(0, Number(p.otherIncome) || 0)
+  const plans = p.studentLoans || []
+  const [full, setFull] = useState(false)
+  const togglePlan = (k: StudentPlan) => set("studentLoans", plans.includes(k) ? plans.filter((x) => x !== k) : [...plans, k])
+  const editSettings = () => document.getElementById("tax-settings")?.scrollIntoView({ behavior: "smooth", block: "start" })
   const realCosts = t.expenses + t.mileage.amount
   /** Tax for the full year at this year's pace, deducting either real costs or a flat allowance. */
   const fullYear = (m: "expenses" | "allowance", allowance = t.allowance) => {
     const k = canProject ? t.elapsed : 1
     const deduct = m === "allowance" ? allowance : realCosts / k
-    return yearTax({ trading: Math.max(0, t.income / k - deduct), property: t.property.income / k, salary: other, scotland: !!p.scotland }).total
+    const trading = Math.max(0, t.income / k - deduct)
+    return yearTax({ trading, property: t.property.income / k, salary: other, scotland: !!p.scotland }).total + studentLoanOnProfit(other, trading, plans)
   }
-  const projTotal = canProject ? fullYear(t.method) : t.total
+  const projTotal = canProject ? fullYear(t.method) : t.reserve
   const startYear = Number(t.year.from.slice(0, 4))
   const nextAllowance = tradingAllowance(startYear + 1)
   const pref: DeductionMethod = p.deductionMethod || "auto"
@@ -49,7 +56,8 @@ export function TaxTab() {
   // Salary logged on the Accounting tab but no yearly salary here: the tax bands would be wrong
   const salaryLogged = !other && data.budget.incomes.some((x) => x.kind === "employment" && x.date >= t.year.from && x.date <= t.year.to)
   const monthsLeft = current ? Math.max(1, Math.round((1 - t.elapsed) * 12)) : 12
-  const setAside = canProject ? projTotal / 12 : t.total / 12
+  // To stay on track: what's still to put aside for the full year, spread over the months left
+  const setAside = canProject ? Math.max(0, projTotal - t.reserve) / monthsLeft : t.reserve / 12
   const rates = mileageRates(p.vehicle || "car", Number(t.year.from.slice(0, 4)))
 
   async function download() {
@@ -89,14 +97,24 @@ export function TaxTab() {
         <Button size="sm" variant="outline" onClick={openAccountant}><UserRoundCheck /> Talk to an accountant</Button>
       </div>
 
-      <Ledger cells={[
-        { label: current ? "Taxable profit so far" : "Taxable profit", value: money(t.profit), sub: `${money(t.income)} income` },
-        { label: current ? "Tax and NI so far" : "Tax and NI", value: money(t.total), sub: "Income tax and Class 4 NI" },
-        { label: "Full-year estimate", value: canProject ? money(projTotal) : current ? "—" : money(t.total), sub: canProject ? "At this year’s pace" : current ? "Shows after the first month" : "This tax year has ended" },
-        { label: "Set aside each month", value: money(setAside), sub: current ? `${monthsLeft} months to go` : "Average across the year" },
-      ]} />
+      <TaxReserve t={t} current={current} projected={canProject ? projTotal : current ? null : t.reserve} perMonth={setAside} monthsLeft={monthsLeft}
+        situation={{ salary: other, plans, scotland: !!p.scotland, basis: p.taxBasis || "cash" }} onEdit={editSettings} />
 
-      <Panel title="How it’s worked out" aside={`${t.year.label} · ${p.scotland ? "Scottish rates" : "UK rates"}`}>
+      <Panel title="How it’s worked out" aside={<button type="button" aria-expanded={full} aria-controls="tax-detail" onClick={() => setFull(!full)} className="font-medium text-brand-ink hover:underline">{full ? "Hide the full breakdown" : "Show the full breakdown"}</button>}>
+        <ol className="grid gap-2 text-[13.5px] sm:grid-cols-4">
+          {[
+            ["1", "Your income", money(t.income + t.property.income)],
+            ["2", t.method === "allowance" ? "Less the trading allowance" : "Less expenses and mileage", money(t.method === "allowance" ? t.compare.allowance.deduct : t.expenses + t.mileage.amount)],
+            ["3", "Taxable profit", money(t.profit + t.property.taxable)],
+            ["4", "Tax, NI" + (t.studentLoan > 0 ? " and student loan" : ""), money(t.reserve)],
+          ].map(([n, k, v]) => (
+            <li key={n} className="rounded-lg bg-secondary/60 px-3 py-2.5">
+              <span className="text-[12px] text-muted-foreground">{n}. {k}</span>
+              <span className="num block font-medium">{v}</span>
+            </li>
+          ))}
+        </ol>
+        {full && <div id="tax-detail" className="mt-4">
         <ul className="divide-y text-[14px]">
           {t.incomeLines.map((l) => <Row key={l.label} k={l.label} v={l.amount} sub={(p.taxBasis || "cash") === "cash" ? "Money received in this tax year" : "Work logged in this tax year"} />)}
           {t.method === "allowance" ? (
@@ -138,15 +156,25 @@ export function TaxTab() {
             </ul>
           </div>
         </div>
+        {plans.length > 0 && (
+          <div className="mt-4">
+            <h3 className="mb-1 text-[11px] font-bold uppercase tracking-[0.08em] text-muted-foreground">Student loan</h3>
+            <ul className="divide-y text-[13.5px]">
+              <Row k="Repayments on your locum profit" v={t.studentLoan}
+                sub={`${plans.map((k) => STUDENT_PLANS.find((x) => x[0] === k)![1]).join(" + ")}: based on your salary plus locum profit, less what your employer already takes from your pay`} strong />
+            </ul>
+          </div>
+        )}
         <div className="mt-4 flex items-baseline justify-between border-t-2 border-foreground pt-3">
-          <span className="font-display text-[16px] font-medium">Estimated tax and NI</span>
-          <span className="num font-display text-[20px] font-medium">{money(t.total)}</span>
+          <span className="font-display text-[16px] font-medium">{t.studentLoan > 0 ? "Estimated tax, NI and student loan" : "Estimated tax and NI"}</span>
+          <span className="num font-display text-[20px] font-medium">{money(t.reserve)}</span>
         </div>
         {t.total > 1000 && (
           <p className="mt-3 rounded-md bg-secondary px-3 py-2.5 text-[12.5px] text-muted-foreground">
             With a bill of £1,000 or more, you’ll usually also make <b className="text-foreground">payments on account</b>: two advance payments towards next year, each usually half of this year’s bill, due 31 January and 31 July (not needed if more than 80% of your tax was already paid another way, for example through your tax code). <a href="https://www.gov.uk/understand-self-assessment-bill/payments-on-account" target="_blank" rel="noopener noreferrer" className="font-medium text-brand-ink hover:underline">GOV.UK</a>
           </p>
         )}
+        </div>}
       </Panel>
 
       <Panel title="Expenses or trading allowance?" aside={`${t.year.label} allowance ${money(t.allowance)}`}>
@@ -196,6 +224,9 @@ export function TaxTab() {
         </p>
       </Panel>
 
+      <StructureCompare key={t.year.from} openAccountant={openAccountant} otherSalary={other} scotland={!!p.scotland}
+        profit={canProject ? Math.max(0, t.income / t.elapsed - (t.method === "allowance" ? t.allowance : realCosts / t.elapsed)) : t.profit} />
+
       <MtdPanel startYear={startYear} />
 
       <Panel title="Understanding your tax" aside="Tips for locum pharmacists">
@@ -215,8 +246,19 @@ export function TaxTab() {
         <GuideNote />
       </Panel>
 
+      <div id="tax-settings" className="scroll-mt-4" />
       <Panel title="Your tax settings">
         <div className="grid gap-4">
+          <div className="grid gap-1.5">
+            <span className="text-[12.5px] text-muted-foreground">Student loan (choose all you repay)</span>
+            <div role="group" aria-label="Student loan plans" className="flex flex-wrap gap-1.5">
+              {STUDENT_PLANS.map(([k, l]) => (
+                <button key={k} type="button" aria-pressed={plans.includes(k)} onClick={() => togglePlan(k)}
+                  className={cn("rounded-full px-4 py-2 text-[13px] font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring", plans.includes(k) ? "bg-foreground text-background" : "bg-secondary text-muted-foreground hover:text-foreground")}>{l}</button>
+              ))}
+            </div>
+            <span className="text-[12px] text-muted-foreground">Not sure which plan you’re on? <a href="https://www.gov.uk/repaying-your-student-loan/which-repayment-plan-you-are-on" target="_blank" rel="noopener noreferrer" className="font-medium text-brand-ink hover:underline">Check on GOV.UK</a></span>
+          </div>
           <div className="grid gap-1.5">
             <span className="text-[12.5px] font-normal text-muted-foreground">Count income</span>
             <Chips<"cash" | "earned"> label="Count income" value={p.taxBasis || "cash"} onChange={(v) => set("taxBasis", v)} options={[["cash", "When I’m paid (HMRC default)"], ["earned", "When I do the work"]]} />
@@ -244,7 +286,7 @@ export function TaxTab() {
       </Panel>
 
       <p className="px-1 text-[12px] leading-relaxed text-muted-foreground">
-        An estimate to help you plan, not financial or tax advice (<a href={`${import.meta.env.BASE_URL}privacy.html#disclaimer`} target="_blank" rel="noopener" className="underline underline-offset-2">disclaimer</a>). It uses 2026 to 2027 rates{startYear !== 2026 ? ` (applied to ${t.year.label} too, so treat it as a rough guide)` : ""}: personal allowance £12,570 (reduced above £100,000), Class 4 NI 6% on profits from £12,570 to £50,270 and 2% above, a {money(t.allowance)} trading allowance, and HMRC mileage of {pence(mileageRates("car", startYear).first)} a mile for the first 10,000 business miles by car ({pence(mileageRates("car", startYear).after)} after). Other self-employed work and rent added on the Accounting tab are included; rent uses the {money(PROPERTY_ALLOWANCE)} property allowance and no National Insurance (it’s voluntary on rent). It leaves out student loans, pensions, savings interest, dividends, rental expenses and payments on account. Self Assessment for {t.year.label} is due online by 31 January {Number(t.year.to.slice(0, 4)) + 1}.
+        An estimate to help you plan, not financial or tax advice (<a href={`${import.meta.env.BASE_URL}privacy.html#disclaimer`} target="_blank" rel="noopener" className="underline underline-offset-2">disclaimer</a>). It uses 2026 to 2027 rates{startYear !== 2026 ? ` (applied to ${t.year.label} too, so treat it as a rough guide)` : ""}: personal allowance £12,570 (reduced above £100,000), Class 4 NI 6% on profits from £12,570 to £50,270 and 2% above, a {money(t.allowance)} trading allowance, and HMRC mileage of {pence(mileageRates("car", startYear).first)} a mile for the first 10,000 business miles by car ({pence(mileageRates("car", startYear).after)} after). Other self-employed work and rent added on the Accounting tab are included; rent uses the {money(PROPERTY_ALLOWANCE)} property allowance and no National Insurance (it’s voluntary on rent). Student loans use the 2026 to 2027 thresholds (Plan 1 £26,900, Plan 2 £29,385, Plan 4 £33,795, Plan 5 £25,000: 9% above; Postgraduate Loan £21,000: 6% above), on your salary plus profit, less what payroll already takes. <a href="https://www.gov.uk/repaying-your-student-loan/what-you-pay" target="_blank" rel="noopener noreferrer" className="underline underline-offset-2">GOV.UK</a>. Take-home is your income less expenses you’ve paid and the tax to put aside (mileage is a tax deduction, not money spent, so it isn’t taken off). It leaves out pensions, savings interest, dividends, rental expenses and payments on account. Self Assessment for {t.year.label} is due online by 31 January {Number(t.year.to.slice(0, 4)) + 1}.
       </p>
     </div>
   )

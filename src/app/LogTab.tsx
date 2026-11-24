@@ -149,7 +149,10 @@ export function LogTab() {
           </div>
           <div className="grid gap-3 sm:grid-cols-[0.8fr_2fr]">
             <MoneyField id="f-fee" label={unit === "mile" ? "Rate per mile" : unit === "hour" ? "Rate per hour" : "Fee each"} value={form.fee} onChange={(e) => setForm({ ...form, fee: e.target.value })} />
-            <Field id="f-desc" label="Description" hint="(optional)" placeholder="e.g. UTI consultation, patient initials…" value={form.desc} onChange={(e) => setForm({ ...form, desc: e.target.value })} />
+            <div className="grid gap-1">
+              <Field id="f-desc" label="Description" hint="(optional)" placeholder="e.g. UTI consultation, morning clinic" value={form.desc} onChange={(e) => setForm({ ...form, desc: e.target.value })} aria-describedby="f-desc-note" />
+              <p id="f-desc-note" className="text-[12px] text-muted-foreground">Don’t add patient names, initials or anything else that could identify a patient.</p>
+            </div>
           </div>
           <div className="flex flex-wrap items-center gap-2 pt-1">
             <Button type="submit" className="h-11 px-6">{editing ? "Save changes" : "Add entry"}</Button>

@@ -2,7 +2,7 @@
 import { cn } from "@/lib/utils"
 
 export const BRAND = "KASA.Rx"
-export const TAGLINE = "The service tracker run by KASA"
+export const TAGLINE = "The operating and financial management platform for pharmacy services"
 export const CONTACT_EMAIL = "KASA.Scripts@gmail.com"
 export const PRIVACY_URL = `${import.meta.env.BASE_URL}privacy.html`
 

@@ -93,7 +93,7 @@ export const PAYE: Tip[] = [
     id: "student-loan",
     q: "How do student loan repayments work with locum income?",
     a: <>
-      <p>If you’re self-employed, HMRC works out your repayments from your Self Assessment return, based on your income for the whole year, and you pay them with your tax. If you’re also employed, repayments are based on your combined income; anything already taken from your salary is deducted. Your plan’s threshold and rate are on GOV.UK. This estimate doesn’t include student loans.</p>
+      <p>If you’re self-employed, HMRC works out your repayments from your Self Assessment return, based on your income for the whole year, and you pay them with your tax. If you’re also employed, repayments are based on your combined income; anything already taken from your salary is deducted. Your plan’s threshold and rate are on GOV.UK. Choose your plan under Your tax settings and the estimate on this page includes it.</p>
     </>,
     sources: [["Repaying your student loan: how much you repay", `${G}/repaying-your-student-loan/what-you-pay`]],
   },
