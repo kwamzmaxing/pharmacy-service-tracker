@@ -4,7 +4,7 @@ The operating and financial management platform for pharmacy services, run by KA
 
 Log pharmacy services and hours, turn them into invoices, email them from your own Gmail, put payment dates in Google Calendar, and follow up on late payments. Works on any phone or computer.
 
-**Site:** <https://kwamzmaxing.github.io/pharmacy-service-tracker/> (once set up; see [SETUP.md](SETUP.md))
+**Site:** <https://kasarx.co.uk/> (moving from <https://kwamzmaxing.github.io/pharmacy-service-tracker/>; see [SETUP.md](SETUP.md))
 
 ## Features
 
