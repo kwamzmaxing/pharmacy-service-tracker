@@ -2,6 +2,7 @@ import { createContext, useContext } from "react"
 import type { Data } from "@/lib/model"
 import type { OutboxItem, PublicSettings } from "@/lib/cloud"
 import type { ConnStatus, GoogleArea } from "@/lib/google"
+import type { CalendarSync } from "./useCalendarSync"
 import type { ThemePref } from "@/lib/theme"
 
 export type Tab = "home" | "shifts" | "log" | "summary" | "invoices" | "insights" | "expenses" | "tax" | "budget" | "clients" | "services" | "account" | "admin"
@@ -55,6 +56,8 @@ export type AppApi = {
   google: Record<GoogleArea, ConnStatus>
   /** Connect a Google service (call from a click). Resolves true when connected. */
   connect: (area: GoogleArea) => Promise<boolean>
+  /** Booked shifts → Google Calendar, kept in step from any page. */
+  calendar: CalendarSync
   disconnectGoogle: () => void
   isAdmin: boolean
   /** This account is an admin, but logged in without Google, so admin is switched off for now. */

@@ -31,7 +31,7 @@ function Action({ icon, label, sub, onClick }: { icon: ReactNode; label: string;
 }
 
 export function HomeTab() {
-  const { data, me, go, google, showFollowUps } = useApp()
+  const { data, me, go, google, showFollowUps, calendar } = useApp()
   const p = data.profile
   const first = callName(p, me.name)
   const months = monthly(data, 12)
@@ -56,6 +56,8 @@ export function HomeTab() {
   // The next shift if it starts within a day (also sent as a reminder notification where possible)
   const soon = upcoming(data).find((s) => { const ms = new Date(`${s.date}T${s.start}:00`).getTime() - Date.now(); return ms > 0 && ms < 86_400_000 })
   if (soon) todo.push({ tone: "info", text: `Next shift: ${placeName(data, soon)} at ${soon.start}${soon.date === today() ? " today" : " tomorrow"}.`, cta: "See shifts", act: () => go("shifts") })
+  // Shift changes queued for Google Calendar while its permission has run out (they send by themselves otherwise)
+  if (data.shiftCal.sync && calendar.waiting > 0 && !calendar.live) todo.push({ tone: "info", text: `${plural(calendar.waiting, "shift change")} waiting to go into Google Calendar.`, cta: "Update calendar", act: () => void calendar.sync(true) })
   if (shiftsDone.length) todo.push({ tone: "warn", text: `${plural(shiftsDone.length, "finished shift")} not in your log yet.`, cta: "Review shifts", act: () => go("shifts") })
   const missing = [!p.fullName && "your name", !(p.sortCode && p.accountNumber) && "bank details"].filter(Boolean)
   if (missing.length) todo.push({ tone: "info", text: `Your invoices are missing ${missing.join(" and ")}.`, cta: "Add details", act: () => go("account") })

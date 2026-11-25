@@ -1,6 +1,6 @@
 // Shifts: work that's booked, on a calendar, with what it should pay. Syncs to Google Calendar
 // and exports a calendar file for Apple Calendar and other apps. Finished shifts go into the log in one tap.
-import { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { toast } from "sonner"
 import { CalendarCheck2, CalendarPlus, ChevronLeft, ChevronRight, Download, ExternalLink, MoreHorizontal, NotebookPen, Pencil, Plus, RefreshCw } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -8,10 +8,10 @@ import { Switch } from "@/components/ui/switch"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { cn } from "@/lib/utils"
 import { addDays, fmtDate, money, monthLabel, parseISO, plural, today, type Shift } from "@/lib/model"
-import { deleteShiftEvent, GOOGLE_HELP, GoogleError, hasToken, listEvents, putShiftEvent, type GoogleEvent } from "@/lib/google"
+import { GOOGLE_HELP, GoogleError, hasToken, listEvents, type GoogleEvent } from "@/lib/google"
 import { saveFile } from "@/lib/store"
 import {
-  eventText, googleLink, logShift, hoursText, icsFile, monthGrid, needsSync, onDay, payText, placeName, shiftHours, shiftKey,
+  googleLink, logShift, hoursText, icsFile, monthGrid, needsSync, onDay, payText, placeName, shiftHours,
   shiftMonth, shiftPay, shiftTimes, thisMonth, timeText, toLog, totals, upcoming, weekStart,
 } from "@/lib/shifts"
 import { useApp } from "./ctx"
@@ -23,14 +23,12 @@ const dayLabel = (iso: string) => parseISO(iso).toLocaleDateString("en-GB", { we
 const longDay = (iso: string) => parseISO(iso).toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long" })
 
 export function ShiftsTab() {
-  const { data, commit, google, connect, me, go } = useApp()
+  const { data, commit, google, connect, me, go, calendar } = useApp()
   const [month, setMonth] = useState(thisMonth())
   const [day, setDay] = useState(today())
   const [draft, setDraft] = useState<ShiftDraft | null>(null)
   const [showGoogle, setShowGoogle] = useState(false)
   const [gEvents, setGEvents] = useState<GoogleEvent[]>([])
-  const [syncing, setSyncing] = useState(false)
-  const running = useRef(false)
 
   const now = new Date()
   const next = upcoming(data, now)
@@ -42,53 +40,9 @@ export function ShiftsTab() {
   const four = totals(data, t0, addDays(t0, 27))
   const weeks = useMemo(() => monthGrid(month), [month])
   const connected = google.calendar === "ready"
-  const recent = (s: Shift) => shiftTimes(s).end.getTime() > Date.now() - 30 * 86400000
-  const waiting = data.shifts.filter((s) => recent(s) && needsSync(data, s)).length + data.shiftCal.deletes.length
 
-  /* ---------- Google Calendar ---------- */
-  const sync = useCallback(async (interactive: boolean) => {
-    if (running.current) return
-    if (!hasToken("calendar")) {
-      if (!interactive) return
-      if (!(await connect("calendar"))) return
-    }
-    running.current = true
-    setSyncing(true)
-    const done: Record<string, { id: string; key: string }> = {}
-    const deleted: string[] = []
-    let failed = 0
-    try {
-      for (const id of data.shiftCal.deletes) {
-        try { await deleteShiftEvent(id, me.email); deleted.push(id) } catch { failed++ }
-      }
-      for (const s of data.shifts.filter((x) => recent(x) && needsSync(data, x))) {
-        const { start, end } = shiftTimes(s)
-        try { done[s.id] = { id: await putShiftEvent({ shiftId: s.id, ...eventText(data, s), start, end }, s.gcalId, me.email), key: shiftKey(data, s) } }
-        catch (e) { failed++; if (e instanceof GoogleError && e.kind !== "failed") throw e }
-      }
-      if (Object.keys(done).length || deleted.length) {
-        commit((d) => {
-          for (const s of d.shifts) if (done[s.id]) { s.gcalId = done[s.id].id; s.gcalSent = done[s.id].key }
-          d.shiftCal.deletes = d.shiftCal.deletes.filter((id) => !deleted.includes(id))
-        })
-      }
-      const n = Object.keys(done).length
-      if (interactive || failed) toast[failed ? "error" : "success"](failed ? `${failed} couldn’t be updated in Google Calendar. Try again later.` : n || deleted.length ? `Google Calendar is up to date (${plural(n + deleted.length, "change")}) ✓` : "Google Calendar is already up to date ✓")
-    } catch (e) {
-      toast.error(e instanceof GoogleError ? GOOGLE_HELP[e.kind] : "Couldn’t reach Google Calendar.")
-    } finally {
-      running.current = false
-      setSyncing(false)
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [data, connect, commit, me.email])
-
-  // While connected and turned on, keep Google Calendar in step after every change
-  useEffect(() => {
-    if (!data.shiftCal.sync || !waiting || !hasToken("calendar")) return
-    const t = setTimeout(() => sync(false), 800)
-    return () => clearTimeout(t)
-  }, [data.shiftCal.sync, waiting, sync])
+  /* ---------- Google Calendar (synced from anywhere by useCalendarSync) ---------- */
+  const { waiting, syncing, sync } = calendar
 
   // Google events for the weeks on screen
   useEffect(() => {
