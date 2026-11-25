@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { addDays, fmtDate, money, plural, today, uid, type Shift } from "@/lib/model"
+import { addDays, fmtDate, money, plural, today, uid, type Shift, type TravelMode } from "@/lib/model"
 import { clashes, hoursText, placeName, shiftHours, shiftPay, timeText } from "@/lib/shifts"
 import { useApp } from "./ctx"
 import { Chips, MoneyField } from "./bits"
@@ -51,14 +51,14 @@ export function ShiftDialog({ draft, onClose }: { draft: ShiftDraft | null; onCl
 
   function save() {
     if (!valid) return
-    const vals: Shift = { ...live, place: f.clientId ? undefined : f.place?.trim().slice(0, 80), notes: f.notes.trim().slice(0, 500) }
+    const vals: Shift = { ...live, place: f.clientId ? undefined : f.place?.trim().slice(0, 80), notes: f.notes.trim().slice(0, 500), from: f.from?.trim().slice(0, 80) || undefined }
     if (existing) {
       const ids = new Set(scope === "later" ? later.map((x) => x.id) : [])
       commit((d) => {
         const s = d.shifts.find((x) => x.id === existing.id)
         if (s) Object.assign(s, vals, { id: s.id, created: s.created, entryId: s.entryId, gcalId: s.gcalId, gcalSent: s.gcalSent, series: s.series })
         // Later shifts in the repeat keep their own dates; everything else follows this one
-        for (const x of d.shifts) if (ids.has(x.id)) Object.assign(x, { start: vals.start, end: vals.end, breakMins: vals.breakMins, clientId: vals.clientId, place: vals.place, pay: vals.pay, rate: vals.rate, notes: vals.notes })
+        for (const x of d.shifts) if (ids.has(x.id)) Object.assign(x, { start: vals.start, end: vals.end, breakMins: vals.breakMins, clientId: vals.clientId, place: vals.place, pay: vals.pay, rate: vals.rate, notes: vals.notes, travel: vals.travel, from: vals.from, travelMins: vals.travelMins })
       }, ids.size ? `${ids.size + 1} shifts updated ✓` : "Shift updated ✓")
     } else {
       const n = Number(repeat) || 1
@@ -117,6 +117,18 @@ export function ShiftDialog({ draft, onClose }: { draft: ShiftDraft | null; onCl
             </div>
             <MoneyField id="sh-rate" label={f.pay === "hourly" ? "Rate per hour" : "Pay for the shift"} value={rate} onChange={(e) => setRate(e.target.value)} />
           </div>
+          <fieldset className="grid gap-3 rounded-xl border p-3">
+            <legend className="px-1 text-[12.5px] text-muted-foreground">Getting there</legend>
+            <Chips<TravelMode> label="Travel by" value={f.travel || data.profile.travelMode || "drive"} onChange={(v) => set({ travel: v })} options={[["drive", "By car"], ["transit", "Public transport"]]} />
+            <div className="grid gap-3 sm:grid-cols-[1fr_8rem]">
+              <div className="grid gap-1.5"><Label htmlFor="sh-from" className="text-[12.5px] font-normal text-muted-foreground">Starting from</Label>
+                <Input id="sh-from" maxLength={80} className="h-11 bg-field text-[15px]" value={f.from ?? ""} onChange={(e) => set({ from: e.target.value })} placeholder={data.profile.homePostcode ? `Home (${data.profile.homePostcode})` : "Home postcode or address"} /></div>
+              <div className="grid gap-1.5"><Label htmlFor="sh-mins" className="text-[12.5px] font-normal text-muted-foreground">Journey (min)</Label>
+                <Input id="sh-mins" inputMode="numeric" className="h-11 bg-field text-[15px]" value={f.travelMins ? String(f.travelMins) : ""} onChange={(e) => { const n = Number(e.target.value.replace(/\D/g, "").slice(0, 3)); set({ travelMins: n > 0 ? n : undefined }) }}
+                  placeholder={(f.travel || data.profile.travelMode || "drive") === "drive" ? "Auto" : "e.g. 45"} /></div>
+            </div>
+            <p className="text-[12px] text-muted-foreground">{(f.travel || data.profile.travelMode || "drive") === "drive" ? "Leave the journey time blank and it’s estimated for you (without traffic)." : "Add your usual journey time to get a time to leave; live times open in Google Maps or Apple Maps."}</p>
+          </fieldset>
           <div className="grid gap-1.5"><Label htmlFor="sh-notes" className="text-[12.5px] font-normal text-muted-foreground">Notes (optional)</Label><Textarea id="sh-notes" rows={2} maxLength={500} placeholder="e.g. Booked through Locate a Locum, ask for keys at the back" className="bg-field text-[15px]" value={f.notes} onChange={(e) => set({ notes: e.target.value })} /></div>
           {!existing && (
             <div className="grid gap-1.5">

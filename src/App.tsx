@@ -13,6 +13,8 @@ import { auth } from "@/lib/firebase"
 import { followUpsDue, initials, newData, type Data } from "@/lib/model"
 import { getSettings, isAdmin as checkAdmin, myOutbox, openVault, recordPerson, type OutboxItem, type PublicSettings, type SaveProblem, type Vault } from "@/lib/cloud"
 import { disconnect, GOOGLE_HELP, GoogleError, status as googleStatus, token as googleToken, type ConnStatus, type GoogleArea } from "@/lib/google"
+import { useCalendarSync } from "@/app/useCalendarSync"
+import { useTrips } from "@/app/useTrips"
 import { AppCtx, type AppApi, type AskOptions, type EmailKind, type LogMode, type Me, type Tab } from "@/app/ctx"
 import { ConfirmDialog, EmailDialog, FeedbackDialog, FollowUpDialog, InvoiceDialog } from "@/app/dialogs"
 import { AuthScreen } from "@/app/AuthScreen"
@@ -352,10 +354,13 @@ export default function App() {
     }
   }, [me])
 
+  const calendar = useCalendarSync(data, commit, connect, me?.email || "", google)
+  useTrips(data, commit)
+
   const api = useMemo<AppApi | null>(() => {
     if (!data || !me) return null
     return {
-      data, me, commit, replaceAll, ask, askFor, go, google, connect, isAdmin: admin, adminNeedsGoogle, recheckAdmin, settings, setSettings, outbox, refreshOutbox, theme, setTheme, logMode,
+      data, me, commit, replaceAll, ask, askFor, go, google, connect, calendar, isAdmin: admin, adminNeedsGoogle, recheckAdmin, settings, setSettings, outbox, refreshOutbox, theme, setTheme, logMode,
       disconnectGoogle: () => { disconnect(); refreshGoogle(); toast("Google disconnected on this device") },
       viewInvoice: (id, justCreated = false) => setInvoiceView({ id, justCreated }),
       openClient: (id) => { setClientView(id); setTab("clients"); window.scrollTo({ top: 0 }) },
@@ -367,7 +372,7 @@ export default function App() {
       logOut: () => leave("You’ve logged out."),
       accountDeleted: () => leave("Your account was deleted."),
     }
-  }, [data, me, commit, replaceAll, ask, askFor, go, google, connect, admin, settings, outbox, refreshOutbox, leave, clientView, theme, setTheme, logMode, adminNeedsGoogle, recheckAdmin])
+  }, [data, me, commit, replaceAll, ask, askFor, go, google, connect, calendar, admin, settings, outbox, refreshOutbox, leave, clientView, theme, setTheme, logMode, adminNeedsGoogle, recheckAdmin])
 
   const confirm = <ConfirmDialog req={askReq} onDone={(ok, value) => { askResolve.current?.(ok, value); askResolve.current = null; setAskReq(null) }} />
   const toaster = <Toaster theme={resolvedTheme} position="bottom-center" mobileOffset={{ bottom: "calc(84px + env(safe-area-inset-bottom))" }} toastOptions={{ style: { fontFamily: "Inter, system-ui, sans-serif", borderRadius: 14 } }} />

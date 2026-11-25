@@ -62,6 +62,9 @@ export type Profile = {
   vehicle: Vehicle
   /** Postcode the journey calculator starts from. */
   homePostcode?: string
+  /** How they usually get to shifts, and how many minutes early they like to arrive. */
+  travelMode?: TravelMode
+  arriveEarly?: number
   /** Scottish taxpayer (different income tax bands). */
   scotland?: boolean
   /** Yearly income from employment (PAYE), to place self-employed profit in the right tax bands. */
@@ -190,8 +193,18 @@ export type Shift = {
   gcalSent?: string
   /** Shifts booked together as a weekly repeat share this, so later ones can be changed together. */
   series?: string
+  /** Getting there: by car or public transport (default: the profile's choice), from where (default: home). */
+  travel?: TravelMode
+  from?: string
+  /** Door-to-door minutes typed in by the person (needed for public transport; overrides the driving estimate). */
+  travelMins?: number
+  /** Cached driving estimate for this shift's from → to. */
+  trip?: Trip
   created: string
 }
+export type TravelMode = "drive" | "transit"
+/** A driving estimate between two places, worked out with free routing (no live traffic). */
+export type Trip = { key: string; mins?: number; miles?: number; approximate?: boolean; lat?: number; lng?: number; failed?: boolean }
 export type ShiftCal = {
   /** Put shifts in Google Calendar automatically while connected. */
   sync: boolean

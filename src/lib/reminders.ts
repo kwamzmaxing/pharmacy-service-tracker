@@ -2,6 +2,7 @@
 // The page works out the reminders and hands them to the service worker (public/reminders-sw.js),
 // which shows each one once when it's due: straight away while the app is open, and in the background
 // where the browser allows it (installed app on Android or a computer, via periodic background sync).
+import { earlyOf, hhmm, journeyMins, leaveBy, minsText } from "./trip"
 import { followUpsDue, money, nextFollowUp, type Data } from "./model"
 import { placeName, shiftTimes, upcoming } from "./shifts"
 
@@ -44,7 +45,7 @@ export function buildReminders(d: Data, p: NotifyPrefs, now = new Date()): Remin
       const isTomorrow = when === dayBefore.getTime()
       out.push({
         id: `shift-${s.id}-${s.date}-${s.start}`, at: when,
-        title: `${isTomorrow ? "Tomorrow" : "Today"}: ${placeName(d, s)} at ${s.start}`, body: `Shift ${s.start}–${s.end}. Open KASA.Rx for details.`, tab: "shifts",
+        title: `${isTomorrow ? "Tomorrow" : "Today"}: ${placeName(d, s)} at ${s.start}`, body: (() => { const m = journeyMins(d, s); return `Shift ${s.start}–${s.end}.${m !== null ? ` Leave by ${hhmm(leaveBy(s, m, earlyOf(d)))} (${minsText(m)} journey).` : ""} Open KASA.Rx for directions.` })(), tab: "shifts",
       })
     }
   }

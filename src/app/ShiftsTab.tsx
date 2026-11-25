@@ -1,36 +1,35 @@
 // Shifts: work that's booked, on a calendar, with what it should pay. Syncs to Google Calendar
 // and exports a calendar file for Apple Calendar and other apps. Finished shifts go into the log in one tap.
-import { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { toast } from "sonner"
-import { CalendarCheck2, CalendarPlus, ChevronLeft, ChevronRight, Download, ExternalLink, MoreHorizontal, NotebookPen, Pencil, Plus, RefreshCw } from "lucide-react"
+import { Bus, Car, CalendarCheck2, CalendarPlus, Navigation, ChevronLeft, ChevronRight, Download, ExternalLink, MoreHorizontal, NotebookPen, Pencil, Plus, RefreshCw } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Switch } from "@/components/ui/switch"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { cn } from "@/lib/utils"
 import { addDays, fmtDate, money, monthLabel, parseISO, plural, today, type Shift } from "@/lib/model"
-import { deleteShiftEvent, GOOGLE_HELP, GoogleError, hasToken, listEvents, putShiftEvent, type GoogleEvent } from "@/lib/google"
+import { GOOGLE_HELP, GoogleError, hasToken, listEvents, type GoogleEvent } from "@/lib/google"
 import { saveFile } from "@/lib/store"
 import {
-  eventText, googleLink, logShift, hoursText, icsFile, monthGrid, needsSync, onDay, payText, placeName, shiftHours, shiftKey,
+  googleLink, logShift, hoursText, icsFile, monthGrid, needsSync, onDay, payText, placeName, shiftHours,
   shiftMonth, shiftPay, shiftTimes, thisMonth, timeText, toLog, totals, upcoming, weekStart,
 } from "@/lib/shifts"
 import { useApp } from "./ctx"
 import { Callout, Empty, Ledger, Panel } from "./bits"
 import { ShiftDialog, type ShiftDraft } from "./ShiftDialog"
+import { GettingTherePanel, useTravel } from "./GettingThere"
 
 const DOW = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
 const dayLabel = (iso: string) => parseISO(iso).toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short" })
 const longDay = (iso: string) => parseISO(iso).toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long" })
 
 export function ShiftsTab() {
-  const { data, commit, google, connect, me, go } = useApp()
+  const { data, commit, google, connect, me, go, calendar } = useApp()
   const [month, setMonth] = useState(thisMonth())
   const [day, setDay] = useState(today())
   const [draft, setDraft] = useState<ShiftDraft | null>(null)
   const [showGoogle, setShowGoogle] = useState(false)
   const [gEvents, setGEvents] = useState<GoogleEvent[]>([])
-  const [syncing, setSyncing] = useState(false)
-  const running = useRef(false)
 
   const now = new Date()
   const next = upcoming(data, now)
@@ -42,53 +41,9 @@ export function ShiftsTab() {
   const four = totals(data, t0, addDays(t0, 27))
   const weeks = useMemo(() => monthGrid(month), [month])
   const connected = google.calendar === "ready"
-  const recent = (s: Shift) => shiftTimes(s).end.getTime() > Date.now() - 30 * 86400000
-  const waiting = data.shifts.filter((s) => recent(s) && needsSync(data, s)).length + data.shiftCal.deletes.length
 
-  /* ---------- Google Calendar ---------- */
-  const sync = useCallback(async (interactive: boolean) => {
-    if (running.current) return
-    if (!hasToken("calendar")) {
-      if (!interactive) return
-      if (!(await connect("calendar"))) return
-    }
-    running.current = true
-    setSyncing(true)
-    const done: Record<string, { id: string; key: string }> = {}
-    const deleted: string[] = []
-    let failed = 0
-    try {
-      for (const id of data.shiftCal.deletes) {
-        try { await deleteShiftEvent(id, me.email); deleted.push(id) } catch { failed++ }
-      }
-      for (const s of data.shifts.filter((x) => recent(x) && needsSync(data, x))) {
-        const { start, end } = shiftTimes(s)
-        try { done[s.id] = { id: await putShiftEvent({ shiftId: s.id, ...eventText(data, s), start, end }, s.gcalId, me.email), key: shiftKey(data, s) } }
-        catch (e) { failed++; if (e instanceof GoogleError && e.kind !== "failed") throw e }
-      }
-      if (Object.keys(done).length || deleted.length) {
-        commit((d) => {
-          for (const s of d.shifts) if (done[s.id]) { s.gcalId = done[s.id].id; s.gcalSent = done[s.id].key }
-          d.shiftCal.deletes = d.shiftCal.deletes.filter((id) => !deleted.includes(id))
-        })
-      }
-      const n = Object.keys(done).length
-      if (interactive || failed) toast[failed ? "error" : "success"](failed ? `${failed} couldn’t be updated in Google Calendar. Try again later.` : n || deleted.length ? `Google Calendar is up to date (${plural(n + deleted.length, "change")}) ✓` : "Google Calendar is already up to date ✓")
-    } catch (e) {
-      toast.error(e instanceof GoogleError ? GOOGLE_HELP[e.kind] : "Couldn’t reach Google Calendar.")
-    } finally {
-      running.current = false
-      setSyncing(false)
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [data, connect, commit, me.email])
-
-  // While connected and turned on, keep Google Calendar in step after every change
-  useEffect(() => {
-    if (!data.shiftCal.sync || !waiting || !hasToken("calendar")) return
-    const t = setTimeout(() => sync(false), 800)
-    return () => clearTimeout(t)
-  }, [data.shiftCal.sync, waiting, sync])
+  /* ---------- Google Calendar (synced from anywhere by useCalendarSync) ---------- */
+  const { waiting, syncing, sync } = calendar
 
   // Google events for the weeks on screen
   useEffect(() => {
@@ -129,6 +84,8 @@ export function ShiftsTab() {
         { label: "This month", value: money(monthTot.pay), sub: `${plural(monthTot.count, "shift")} in ${monthLabel(t0.slice(0, 7)).split(" ")[0]}` },
         { label: "Next 4 weeks", value: money(four.pay), sub: four.count ? `${plural(four.count, "shift")} booked` : "Nothing booked" },
       ]} />
+
+      {next[0] && <GettingTherePanel key={next[0].id} s={next[0]} />}
 
       {pending.length > 0 && (
         <Callout>
@@ -283,6 +240,7 @@ function ShiftRow({ s, withDate, onEdit, onLog }: { s: Shift; withDate?: boolean
   const { data, go } = useApp()
   const done = shiftTimes(s).end <= new Date()
   const synced = !!s.gcalId && !needsSync(data, s)
+  const travel = useTravel(s)
   return (
     <li className="flex items-center gap-3 py-2.5">
       <button type="button" onClick={onEdit} className="flex min-w-0 flex-1 items-center gap-3 rounded-md text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
@@ -298,6 +256,7 @@ function ShiftRow({ s, withDate, onEdit, onLog }: { s: Shift; withDate?: boolean
           <span className="block text-[12.5px] leading-snug text-muted-foreground">
             {timeText(s)} · {hoursText(Math.round(shiftHours(s) * 100) / 100)} · {payText(s)}{synced ? " · in Google Calendar" : ""}
           </span>
+          {!done && <span className="flex items-center gap-1 text-[12.5px] leading-snug text-muted-foreground">{travel.mode === "drive" ? <Car className="size-3.5" aria-hidden /> : <Bus className="size-3.5" aria-hidden />}{travel.text}</span>}
         </span>
         <span className="num whitespace-nowrap text-[14.5px]">{money(shiftPay(s))}</span>
       </button>
@@ -308,6 +267,12 @@ function ShiftRow({ s, withDate, onEdit, onLog }: { s: Shift; withDate?: boolean
         <DropdownMenuContent align="end">
           <DropdownMenuItem onSelect={onEdit}><Pencil /> Edit</DropdownMenuItem>
           <DropdownMenuSeparator />
+          {!done && <>
+            <DropdownMenuItem asChild><a href={travel.links.google} target="_blank" rel="noopener noreferrer"><Navigation /> Directions in Google Maps</a></DropdownMenuItem>
+            {travel.links.waze && <DropdownMenuItem asChild><a href={travel.links.waze} target="_blank" rel="noopener noreferrer"><Navigation /> Open in Waze</a></DropdownMenuItem>}
+            <DropdownMenuItem asChild><a href={travel.links.apple} target="_blank" rel="noopener noreferrer"><Navigation /> Directions in Apple Maps</a></DropdownMenuItem>
+            <DropdownMenuSeparator />
+          </>}
           <DropdownMenuItem asChild><a href={googleLink(data, s)} target="_blank" rel="noopener noreferrer"><ExternalLink /> Add to Google Calendar</a></DropdownMenuItem>
           <DropdownMenuItem onSelect={() => saveFile(`shift-${s.date}.ics`, new Blob([icsFile(data, [s])], { type: "text/calendar;charset=utf-8" }))}><Download /> Calendar file (.ics)</DropdownMenuItem>
         </DropdownMenuContent>
