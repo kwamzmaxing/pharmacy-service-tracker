@@ -45,11 +45,13 @@ Last updated 25 November 2026. Tick items off as you go.
 
 ## 6. Future features
 - [x] Google Calendar sync from any page, not just Shifts
+- [x] Getting to shifts: drive time, leave-by time, Google Maps / Waze / Apple Maps (public transport uses your own journey time)
 - [ ] Bank statement upload: match payments to invoices and mark them paid (no regulation needed)
 - [ ] Live bank link through an FCA-authorised Open Banking provider (needs a small server)
 - [ ] Always-on calendar sync without signing in to Google every hour (same server as the bank link)
 
 ## Notes
+- **Travel times:** driving estimates come from free routing (OSRM) with no live traffic; public transport has no free UK-wide source, so it uses the journey time you type and opens live times in Google Maps or Apple Maps. Live traffic or public transport estimates in the app would need Google's paid Routes API.
 - **Shift sync to Google Calendar:** about 1 second after saving, from any page, when sync is on and Calendar is connected in this visit (Google's permission lasts about an hour). When the permission has run out, changes queue up and Home shows "N shift changes waiting to go into Google Calendar" with an Update calendar button. Shifts ending more than 30 days ago aren't synced.
 - **Google Cloud credit:** £225.52 free trial credit, valid until 17 February 2027; unused credit expires. Charges after that go to your card; the £1 alert warns you.
 

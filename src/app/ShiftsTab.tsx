@@ -2,7 +2,7 @@
 // and exports a calendar file for Apple Calendar and other apps. Finished shifts go into the log in one tap.
 import { useEffect, useMemo, useState } from "react"
 import { toast } from "sonner"
-import { CalendarCheck2, CalendarPlus, ChevronLeft, ChevronRight, Download, ExternalLink, MoreHorizontal, NotebookPen, Pencil, Plus, RefreshCw } from "lucide-react"
+import { Bus, Car, CalendarCheck2, CalendarPlus, Navigation, ChevronLeft, ChevronRight, Download, ExternalLink, MoreHorizontal, NotebookPen, Pencil, Plus, RefreshCw } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Switch } from "@/components/ui/switch"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
@@ -17,6 +17,7 @@ import {
 import { useApp } from "./ctx"
 import { Callout, Empty, Ledger, Panel } from "./bits"
 import { ShiftDialog, type ShiftDraft } from "./ShiftDialog"
+import { GettingTherePanel, useTravel } from "./GettingThere"
 
 const DOW = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
 const dayLabel = (iso: string) => parseISO(iso).toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short" })
@@ -83,6 +84,8 @@ export function ShiftsTab() {
         { label: "This month", value: money(monthTot.pay), sub: `${plural(monthTot.count, "shift")} in ${monthLabel(t0.slice(0, 7)).split(" ")[0]}` },
         { label: "Next 4 weeks", value: money(four.pay), sub: four.count ? `${plural(four.count, "shift")} booked` : "Nothing booked" },
       ]} />
+
+      {next[0] && <GettingTherePanel key={next[0].id} s={next[0]} />}
 
       {pending.length > 0 && (
         <Callout>
@@ -237,6 +240,7 @@ function ShiftRow({ s, withDate, onEdit, onLog }: { s: Shift; withDate?: boolean
   const { data, go } = useApp()
   const done = shiftTimes(s).end <= new Date()
   const synced = !!s.gcalId && !needsSync(data, s)
+  const travel = useTravel(s)
   return (
     <li className="flex items-center gap-3 py-2.5">
       <button type="button" onClick={onEdit} className="flex min-w-0 flex-1 items-center gap-3 rounded-md text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
@@ -252,6 +256,7 @@ function ShiftRow({ s, withDate, onEdit, onLog }: { s: Shift; withDate?: boolean
           <span className="block text-[12.5px] leading-snug text-muted-foreground">
             {timeText(s)} · {hoursText(Math.round(shiftHours(s) * 100) / 100)} · {payText(s)}{synced ? " · in Google Calendar" : ""}
           </span>
+          {!done && <span className="flex items-center gap-1 text-[12.5px] leading-snug text-muted-foreground">{travel.mode === "drive" ? <Car className="size-3.5" aria-hidden /> : <Bus className="size-3.5" aria-hidden />}{travel.text}</span>}
         </span>
         <span className="num whitespace-nowrap text-[14.5px]">{money(shiftPay(s))}</span>
       </button>
@@ -262,6 +267,12 @@ function ShiftRow({ s, withDate, onEdit, onLog }: { s: Shift; withDate?: boolean
         <DropdownMenuContent align="end">
           <DropdownMenuItem onSelect={onEdit}><Pencil /> Edit</DropdownMenuItem>
           <DropdownMenuSeparator />
+          {!done && <>
+            <DropdownMenuItem asChild><a href={travel.links.google} target="_blank" rel="noopener noreferrer"><Navigation /> Directions in Google Maps</a></DropdownMenuItem>
+            {travel.links.waze && <DropdownMenuItem asChild><a href={travel.links.waze} target="_blank" rel="noopener noreferrer"><Navigation /> Open in Waze</a></DropdownMenuItem>}
+            <DropdownMenuItem asChild><a href={travel.links.apple} target="_blank" rel="noopener noreferrer"><Navigation /> Directions in Apple Maps</a></DropdownMenuItem>
+            <DropdownMenuSeparator />
+          </>}
           <DropdownMenuItem asChild><a href={googleLink(data, s)} target="_blank" rel="noopener noreferrer"><ExternalLink /> Add to Google Calendar</a></DropdownMenuItem>
           <DropdownMenuItem onSelect={() => saveFile(`shift-${s.date}.ics`, new Blob([icsFile(data, [s])], { type: "text/calendar;charset=utf-8" }))}><Download /> Calendar file (.ics)</DropdownMenuItem>
         </DropdownMenuContent>

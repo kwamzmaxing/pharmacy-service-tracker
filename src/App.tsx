@@ -14,6 +14,7 @@ import { followUpsDue, initials, newData, type Data } from "@/lib/model"
 import { getSettings, isAdmin as checkAdmin, myOutbox, openVault, recordPerson, type OutboxItem, type PublicSettings, type SaveProblem, type Vault } from "@/lib/cloud"
 import { disconnect, GOOGLE_HELP, GoogleError, status as googleStatus, token as googleToken, type ConnStatus, type GoogleArea } from "@/lib/google"
 import { useCalendarSync } from "@/app/useCalendarSync"
+import { useTrips } from "@/app/useTrips"
 import { AppCtx, type AppApi, type AskOptions, type EmailKind, type LogMode, type Me, type Tab } from "@/app/ctx"
 import { ConfirmDialog, EmailDialog, FeedbackDialog, FollowUpDialog, InvoiceDialog } from "@/app/dialogs"
 import { AuthScreen } from "@/app/AuthScreen"
@@ -354,6 +355,7 @@ export default function App() {
   }, [me])
 
   const calendar = useCalendarSync(data, commit, connect, me?.email || "", google)
+  useTrips(data, commit)
 
   const api = useMemo<AppApi | null>(() => {
     if (!data || !me) return null
