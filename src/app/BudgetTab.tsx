@@ -12,6 +12,7 @@ import { fmtDate, money, monthLabel, today, uid, type Budget, type IncomeKind, t
 import { allocated, BASES, TAX_TAB_KINDS, freeColor, INCOME_KINDS, incomeKindName, MAX_POTS, moneyIn, pruneMoved, starterPots, STYLES, suggest } from "@/lib/budget"
 import { useApp } from "./ctx"
 import { SavingsGuide } from "./SavingsGuide"
+import { BalancePanel, OutgoingsPanel } from "./Outgoings"
 import { Chips, Empty, Field, Ledger, MoneyField, Panel } from "./bits"
 import { Donut, type Slice } from "./charts"
 
@@ -59,7 +60,7 @@ export function BudgetTab() {
     <div className="grid gap-5 sm:gap-6">
       <div className="grid gap-2">
         <h1 className="font-display text-[22px] font-medium">Accounting</h1>
-        <p className="max-w-2xl text-[14px] text-muted-foreground">Share out what comes in: tax first, then bills, savings and spending. Pick a ready-made split for how you like to save, or make your own.</p>
+        <p className="max-w-2xl text-[14px] text-muted-foreground">Share out what comes in: tax first, then what you pay each month, then savings and spending to suit how you like to save. Or make your own split.</p>
       </div>
 
       <div className="grid gap-3">
@@ -76,6 +77,8 @@ export function BudgetTab() {
         { label: "Saving & investing", value: m.total > 0 ? pctText((saving / m.total) * 100) : "—", sub: m.total > 0 ? `${money(saving)} a month` : "Once money comes in" },
       ]} />
 
+      <OutgoingsPanel list={b.outgoings} setB={setB} ask={ask} />
+
       <Panel title="Your split" aside={<Chips label="Which split" value={b.active} options={[["suggested", "Suggested for me"], ["custom", "My own"]]} onChange={(v) => {
         if (v === "custom" && !b.custom.length) startOwnSplit(sug.pots.length ? "suggestion" : "starter")
         else setB((x) => void (x.active = v))
@@ -88,10 +91,7 @@ export function BudgetTab() {
               <Chips label="Saving style" value={b.style} options={STYLES.map(([k, l]) => [k, l] as [SaverStyle, string])} onChange={(v) => setB((x) => void (x.style = v))} />
               <p className="text-[13px] text-muted-foreground">{STYLES.find((s) => s[0] === b.style)?.[2]}</p>
             </div>
-            <div className="grid gap-4 sm:grid-cols-2">
-              <SavedMoney id="b-ess" label="Essentials per month (rent, bills, food, travel)" value={b.essentials} onSave={(n) => setB((x) => void (x.essentials = n), "Saved ✓")} />
-              <SavedMoney id="b-debt" label="Debt repayments per month (cards, loans)" value={b.debt} onSave={(n) => setB((x) => void (x.debt = n), "Saved ✓")} />
-            </div>
+            {!b.outgoings.length && <p className="text-[13px] text-muted-foreground">Add what you pay each month below (rent, car, gym, savings, ISA…) and the split works around it.</p>}
             <label className="flex items-center justify-between gap-4 text-[14px]">
               <span>I already have 3 to 6 months of essentials saved<span className="block text-[12.5px] text-muted-foreground">Its share goes to savings or investing instead.</span></span>
               <Switch checked={b.emergencyDone} onCheckedChange={(v) => setB((x) => void (x.emergencyDone = v))} />
@@ -123,6 +123,11 @@ export function BudgetTab() {
                       <span className="min-w-0 text-[14.5px] font-medium">{p.name}</span>
                       <span className="num whitespace-nowrap text-right text-[14.5px]">{money(amountOf(p))} <span className="text-[12.5px] text-muted-foreground">· {p.pct}%</span></span>
                       {p.why && <span className="col-start-2 col-end-4 mt-0.5 text-[12.5px] leading-snug text-muted-foreground">{p.why}</span>}
+                      {p.items && (
+                        <span className="col-start-2 col-end-4 mt-1.5 grid gap-0.5 text-[12.5px]">
+                          {p.items.map((it, k) => <span key={k} className="flex justify-between gap-3"><span className="truncate text-muted-foreground">{it.name}</span><span className="num">{money(it.amount)}</span></span>)}
+                        </span>
+                      )}
                     </button>
                   </li>
                 ))}
@@ -135,6 +140,8 @@ export function BudgetTab() {
           </div>
         )}
       </Panel>
+
+      {m.total > 0 && <BalancePanel sug={sug} emergencyDone={b.emergencyDone} tips={b.tips} setB={setB} />}
 
       {m.total > 0 && pots.length > 0 && <MoveMoney pots={pots} amountOf={amountOf} moved={b.moved} setB={setB} basisNote={b.basis !== "month"} />}
 

@@ -137,7 +137,10 @@ export type Invoice = {
 export type SaverStyle = "heavy" | "balanced" | "light" | "debt"
 export type PotKind = "tax" | "business" | "essentials" | "debt" | "emergency" | "savings" | "invest" | "spending" | "custom"
 /** One slice of the pie. `color` is a fixed palette slot (0–7) that stays with the pot. */
-export type Pot = { id: string; name: string; pct: number; color: number; kind: PotKind; why?: string }
+export type Pot = { id: string; name: string; pct: number; color: number; kind: PotKind; why?: string; items?: { name: string; amount: number }[] }
+/** Something paid regularly, entered on the Accounting tab. */
+export type OutCat = "housing" | "bills" | "food" | "transport" | "childcare" | "insurance" | "essential" | "subscriptions" | "health" | "lifestyle" | "debt" | "emergency" | "savings" | "isa" | "pension"
+export type Outgoing = { id: string; name: string; cat: OutCat; amount: number }
 export type IncomeKind = "employment" | "selfemployed" | "rental" | "benefits" | "investment" | "gift" | "other"
 /** Money from somewhere other than an invoice. */
 export type OtherIncome = { id: string; date: string; amount: number; kind: IncomeKind; desc: string; setAsideTax: boolean }
@@ -157,10 +160,14 @@ export type Budget = {
   incomes: OtherIncome[]
   /** Pots ticked off as moved, by month (YYYY-MM). */
   moved: Record<string, string[]>
+  /** What they pay each month, by category. Replaces the single essentials and debt figures once used. */
+  outgoings: Outgoing[]
+  /** Show suggestions for where to cut back. */
+  tips: boolean
 }
 export const defaultBudget = (): Budget => ({
   active: "suggested", style: "balanced", essentials: 0, debt: 0, emergencyDone: false,
-  basis: "month", ownIncome: 0, custom: [], incomes: [], moved: {},
+  basis: "month", ownIncome: 0, custom: [], incomes: [], moved: {}, outgoings: [], tips: true,
 })
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function normBudget(raw: any): Budget {
@@ -168,6 +175,13 @@ function normBudget(raw: any): Budget {
   b.custom = Array.isArray(b.custom) ? b.custom.slice(0, 8) : []
   b.incomes = Array.isArray(b.incomes) ? b.incomes : []
   b.moved = b.moved && typeof b.moved === "object" ? b.moved : {}
+  b.outgoings = Array.isArray(b.outgoings) ? b.outgoings : []
+  // Older budgets had one essentials figure and one debt figure: carry them over as outgoings, once
+  if (!b.outgoings.length && (Number(b.essentials) > 0 || Number(b.debt) > 0)) {
+    if (Number(b.essentials) > 0) b.outgoings.push({ id: "old-essentials", name: "Essentials", cat: "essential", amount: Number(b.essentials) })
+    if (Number(b.debt) > 0) b.outgoings.push({ id: "old-debt", name: "Debt repayments", cat: "debt", amount: Number(b.debt) })
+    b.essentials = 0; b.debt = 0
+  }
   return b
 }
 

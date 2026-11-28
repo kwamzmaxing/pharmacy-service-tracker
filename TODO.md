@@ -45,6 +45,7 @@ Last updated 25 November 2026. Tick items off as you go.
 
 ## 6. Future features
 - [x] Google Calendar sync from any page, not just Shifts
+- [x] Accounting: monthly outgoings by category, smarter split, 5-star balance score and cut-back ideas
 - [x] Getting to shifts: drive time, leave-by time, Google Maps / Waze / Apple Maps (public transport uses your own journey time)
 - [ ] Bank statement upload: match payments to invoices and mark them paid (no regulation needed)
 - [ ] Live bank link through an FCA-authorised Open Banking provider (needs a small server)
